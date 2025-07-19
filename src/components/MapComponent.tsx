@@ -4,6 +4,7 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { toast } from "sonner";
 import { fetchLocationBoundary, calculateScaleRatio, transformOverlayGeometry, LocationBounds } from "@/lib/boundaryService";
+import { MAPBOX_TOKEN } from "@/lib/config";
 
 interface MapComponentProps {
   baseLocation?: [number, number];
@@ -20,7 +21,6 @@ export const MapComponent = ({
 }: MapComponentProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [mapboxToken, setMapboxToken] = useState("");
   const [baseBounds, setBaseBounds] = useState<LocationBounds | null>(null);
   const [overlayBounds, setOverlayBounds] = useState<LocationBounds | null>(null);
   const [isLoadingBoundaries, setIsLoadingBoundaries] = useState(false);
@@ -29,26 +29,7 @@ export const MapComponent = ({
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    // For demo purposes, we'll use a placeholder token
-    // In production, this should come from environment variables
-    const token = mapboxToken || "pk.your_mapbox_token_here";
-    mapboxgl.accessToken = token;
-
-    // Show token input if no token is provided
-    if (!mapboxToken) {
-      toast("Please enter your Mapbox token to use the map", {
-        duration: 5000,
-        action: {
-          label: "Enter Token",
-          onClick: () => {
-            const token = prompt("Enter your Mapbox public token (get one from https://mapbox.com):");
-            if (token) {
-              setMapboxToken(token);
-            }
-          }
-        }
-      });
-    }
+    mapboxgl.accessToken = MAPBOX_TOKEN;
 
     try {
       map.current = new mapboxgl.Map({
@@ -93,17 +74,16 @@ export const MapComponent = ({
     return () => {
       map.current?.remove();
     };
-  }, [mapboxToken]);
+  }, []);
 
   // Load base location boundary
   useEffect(() => {
-    if (!mapLoaded || !map.current || !baseLocation || !baseLocationName || !mapboxToken) {
+    if (!mapLoaded || !map.current || !baseLocation || !baseLocationName) {
       console.log("Base boundary loading skipped - requirements not met:", {
         mapLoaded,
         hasMap: !!map.current,
         baseLocation,
-        baseLocationName,
-        mapboxToken: !!mapboxToken
+        baseLocationName
       });
       return;
     }
@@ -111,7 +91,7 @@ export const MapComponent = ({
     console.log("Loading base boundary for:", baseLocationName);
     setIsLoadingBoundaries(true);
     
-    fetchLocationBoundary(baseLocationName, baseLocation, mapboxToken)
+    fetchLocationBoundary(baseLocationName, baseLocation, MAPBOX_TOKEN)
       .then((bounds) => {
         console.log("Base boundary loaded:", bounds);
         setBaseBounds(bounds);
@@ -179,17 +159,16 @@ export const MapComponent = ({
       .finally(() => {
         setIsLoadingBoundaries(false);
       });
-  }, [baseLocation, baseLocationName, mapboxToken, mapLoaded]);
+  }, [baseLocation, baseLocationName, mapLoaded]);
 
   // Load overlay location boundary and create overlay
   useEffect(() => {
-    if (!mapLoaded || !map.current || !overlayLocation || !overlayLocationName || !mapboxToken || !baseBounds) {
+    if (!mapLoaded || !map.current || !overlayLocation || !overlayLocationName || !baseBounds) {
       console.log("Overlay loading skipped - requirements not met:", {
         mapLoaded,
         hasMap: !!map.current,
         overlayLocation,
         overlayLocationName,
-        mapboxToken: !!mapboxToken,
         baseBounds: !!baseBounds
       });
       return;
@@ -198,7 +177,7 @@ export const MapComponent = ({
     console.log("Loading overlay boundary for:", overlayLocationName);
     setIsLoadingBoundaries(true);
     
-    fetchLocationBoundary(overlayLocationName, overlayLocation, mapboxToken)
+    fetchLocationBoundary(overlayLocationName, overlayLocation, MAPBOX_TOKEN)
       .then((bounds) => {
         console.log("Overlay boundary loaded:", bounds);
         setOverlayBounds(bounds);
@@ -280,7 +259,7 @@ export const MapComponent = ({
       .finally(() => {
         setIsLoadingBoundaries(false);
       });
-  }, [overlayLocation, overlayLocationName, mapboxToken, baseBounds, mapLoaded]);
+  }, [overlayLocation, overlayLocationName, baseBounds, mapLoaded]);
 
   return (
     <div className="relative w-full h-full">
@@ -292,26 +271,6 @@ export const MapComponent = ({
           <div className="flex items-center gap-2 text-sm">
             <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
             Loading boundaries...
-          </div>
-        </div>
-      )}
-      
-      {!mapboxToken && (
-        <div className="absolute inset-0 bg-muted/80 flex items-center justify-center rounded-lg">
-          <div className="text-center p-6 bg-card rounded-lg shadow-lg max-w-md">
-            <h3 className="font-semibold mb-2">Mapbox Token Required</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              This demo requires a Mapbox token. Get one free at mapbox.com
-            </p>
-            <button
-              onClick={() => {
-                const token = prompt("Enter your Mapbox public token:");
-                if (token) setMapboxToken(token);
-              }}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
-            >
-              Enter Token
-            </button>
           </div>
         </div>
       )}
