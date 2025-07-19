@@ -45,7 +45,8 @@ serve(async (req) => {
     if (id) {
       query = query.eq('id', id)
     } else {
-      query = query.eq('name', name)
+      // Try exact match first, then fallback to name_long, then partial match
+      query = query.or(`name.eq.${name},name_long.eq.${name},name.ilike.%${name}%,name_long.ilike.%${name}%`)
     }
 
     const { data: boundary, error } = await query.single()
