@@ -1,15 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || localStorage.getItem('supabase_url')
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('supabase_anon_key')
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase configuration missing. Please connect to Supabase or configure manually.')
-  throw new Error('Supabase configuration missing')
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export interface BoundarySearchResult {
   id: number;
