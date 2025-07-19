@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 import { toast } from "sonner";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || localStorage.getItem('supabase_url')
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('supabase_anon_key')
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase configuration missing')
+  console.error('Supabase configuration missing. Please connect to Supabase or configure manually.')
+  throw new Error('Supabase configuration missing')
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
