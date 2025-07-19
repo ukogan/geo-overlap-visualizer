@@ -3,6 +3,7 @@ import { Search, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { MAPBOX_TOKEN } from "@/lib/config";
 
 interface LocationSearchProps {
   onLocationSelect: (location: string, coordinates: [number, number]) => void;
@@ -25,7 +26,7 @@ export const LocationSearch = ({ onLocationSelect, placeholder = "Search for a l
     try {
       // Using Mapbox Geocoding API - will need actual token in production
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=YOUR_MAPBOX_TOKEN&types=place,region,country&limit=5`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${MAPBOX_TOKEN}&types=place,region,country&limit=5`
       );
       
       if (response.ok) {
