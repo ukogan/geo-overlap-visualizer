@@ -65,24 +65,25 @@ function getBoundingBox(geometry: BoundaryData["geometry"]): [number, number, nu
   return [minLng, minLat, maxLng, maxLat];
 }
 
-// Fetch boundary data for a location
+// Fetch boundary data for a location using Nominatim (OpenStreetMap)
 export async function fetchLocationBoundary(
   locationName: string, 
   coordinates: [number, number],
-  mapboxToken: string
+  mapboxToken: string // Keep for compatibility, but we'll use Nominatim for boundaries
 ): Promise<LocationBounds> {
   try {
-    // Try to get boundary data from Mapbox Boundaries API
+    console.log("Fetching boundary for:", locationName);
+    // Use Nominatim API for actual polygon boundaries
     const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationName)}.json?access_token=${mapboxToken}&types=place,region,country&limit=1&geometry=polygon`
+      `https://nominatim.openstreetmap.org/search?format=geojson&polygon_geojson=1&limit=1&q=${encodeURIComponent(locationName)}`
     );
 
     if (!response.ok) {
-      throw new Error("Failed to fetch boundary data");
+      throw new Error(`Nominatim API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("Boundary API response:", data);
+    console.log("Nominatim API response:", data);
     
     if (data.features && data.features.length > 0) {
       const feature = data.features[0];
@@ -93,8 +94,8 @@ export async function fetchLocationBoundary(
           type: "Feature",
           geometry: feature.geometry,
           properties: {
-            name: feature.place_name || locationName,
-            center: feature.center || coordinates
+            name: feature.properties?.display_name || locationName,
+            center: coordinates // Use the coordinates from our search
           }
         };
 
@@ -123,12 +124,12 @@ export async function fetchLocationBoundary(
       }
     }
 
-    console.log("No polygon data found, creating fallback boundary");
+    console.log("No polygon data found, creating fallback boundary for:", locationName);
     // Fallback: create a rough circular approximation
     return createFallbackBoundary(locationName, coordinates);
 
   } catch (error) {
-    console.error("Error fetching boundary:", error);
+    console.error("Error fetching boundary from Nominatim:", error);
     toast.error(`Could not load boundary for ${locationName}. Using approximate area.`);
     return createFallbackBoundary(locationName, coordinates);
   }
