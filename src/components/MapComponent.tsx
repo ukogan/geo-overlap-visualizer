@@ -3,8 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { toast } from "sonner";
-import { fetchLocationBoundary, calculateScaleRatio, transformOverlayGeometry, LocationBounds } from "@/lib/boundaryService";
-import { MAPBOX_TOKEN } from "@/lib/config";
+import { getBoundaryData, calculateScaleRatio, transformOverlayGeometry, LocationBounds } from "@/lib/supabaseBoundaryService";
 
 interface MapComponentProps {
   baseLocation?: [number, number];
@@ -29,47 +28,52 @@ export const MapComponent = ({
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
+    // Import MAPBOX_TOKEN locally to avoid build issues
+    import("@/lib/config").then(({ MAPBOX_TOKEN }) => {
+      mapboxgl.accessToken = MAPBOX_TOKEN;
 
-    try {
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: "mapbox://styles/mapbox/light-v11",
-        center: baseLocation || [-74.5, 40],
-        zoom: 9,
-        attributionControl: false,
-      });
+      try {
+        map.current = new mapboxgl.Map({
+          container: mapContainer.current,
+          style: "mapbox://styles/mapbox/light-v11",
+          center: baseLocation || [-74.5, 40],
+          zoom: 9,
+          attributionControl: false,
+        });
 
-      // Add navigation controls
-      map.current.addControl(
-        new mapboxgl.NavigationControl({
-          visualizePitch: false,
-        }),
-        "top-right"
-      );
+        // Add navigation controls
+        map.current.addControl(
+          new mapboxgl.NavigationControl({
+            visualizePitch: false,
+          }),
+          "top-right"
+        );
 
-      // Add attribution
-      map.current.addControl(
-        new mapboxgl.AttributionControl({
-          compact: true,
-        }),
-        "bottom-right"
-      );
+        // Add attribution
+        map.current.addControl(
+          new mapboxgl.AttributionControl({
+            compact: true,
+          }),
+          "bottom-right"
+        );
 
-      map.current.on("load", () => {
-        console.log("Map loaded successfully");
-        setMapLoaded(true);
-        toast("Map loaded! Select locations to compare.");
-      });
+        map.current.on("load", () => {
+          console.log("Map loaded successfully");
+          setMapLoaded(true);
+          toast("Map loaded! Select locations to compare.");
+        });
 
-      map.current.on("error", (e) => {
-        console.error("Map error:", e);
-      });
+        map.current.on("error", (e) => {
+          console.error("Map error:", e);
+        });
 
-    } catch (error) {
-      console.error("Error initializing map:", error);
-      toast("Map initialization failed. Please check your Mapbox token.");
-    }
+      } catch (error) {
+        console.error("Error initializing map:", error);
+        toast("Map initialization failed. Please check your Mapbox token.");
+      }
+    }).catch((error) => {
+      console.error("Error loading config:", error);
+    });
 
     return () => {
       map.current?.remove();
@@ -91,7 +95,8 @@ export const MapComponent = ({
     console.log("Loading base boundary for:", baseLocationName);
     setIsLoadingBoundaries(true);
     
-    fetchLocationBoundary(baseLocationName, baseLocation, MAPBOX_TOKEN)
+    const boundaryId = (window as any).baseBoundaryId;
+    getBoundaryData(boundaryId, baseLocationName)
       .then((bounds) => {
         console.log("Base boundary loaded:", bounds);
         setBaseBounds(bounds);
@@ -177,7 +182,8 @@ export const MapComponent = ({
     console.log("Loading overlay boundary for:", overlayLocationName);
     setIsLoadingBoundaries(true);
     
-    fetchLocationBoundary(overlayLocationName, overlayLocation, MAPBOX_TOKEN)
+    const boundaryId = (window as any).overlayBoundaryId;
+    getBoundaryData(boundaryId, overlayLocationName)
       .then((bounds) => {
         console.log("Overlay boundary loaded:", bounds);
         setOverlayBounds(bounds);

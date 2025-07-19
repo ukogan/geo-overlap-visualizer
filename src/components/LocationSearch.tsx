@@ -3,9 +3,10 @@ import { Search, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { searchBoundaries, BoundarySearchResult } from "@/lib/supabaseBoundaryService";
 
 interface LocationSearchProps {
-  onLocationSelect: (location: string, coordinates: [number, number]) => void;
+  onLocationSelect: (location: string, coordinates: [number, number], boundaryId?: number) => void;
   placeholder?: string;
   className?: string;
 }
@@ -13,7 +14,7 @@ interface LocationSearchProps {
 export const LocationSearch = ({ onLocationSelect, placeholder = "Search for a location...", className }: LocationSearchProps) => {
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<BoundarySearchResult[]>([]);
 
   const searchLocations = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -23,28 +24,12 @@ export const LocationSearch = ({ onLocationSelect, placeholder = "Search for a l
 
     setIsLoading(true);
     try {
-      // Use Nominatim for search to match our boundary data source
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(searchQuery)}`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Nominatim search results:", data);
-        
-        // Transform Nominatim results to our format
-        const transformedResults = data.map((item: any) => ({
-          place_name: item.display_name,
-          center: [parseFloat(item.lon), parseFloat(item.lat)],
-          id: item.place_id,
-          osm_type: item.osm_type,
-          osm_id: item.osm_id
-        }));
-        
-        setSuggestions(transformedResults);
-      }
+      // Use our Supabase-hosted boundary data
+      const results = await searchBoundaries(searchQuery);
+      console.log("Boundary search results:", results);
+      setSuggestions(results);
     } catch (error) {
-      console.error("Error searching locations with Nominatim:", error);
+      console.error("Error searching boundaries:", error);
       setSuggestions([]);
     } finally {
       setIsLoading(false);
@@ -56,8 +41,16 @@ export const LocationSearch = ({ onLocationSelect, placeholder = "Search for a l
     searchLocations(value);
   };
 
-  const handleLocationClick = (location: any) => {
-    onLocationSelect(location.place_name, location.center);
+  const handleLocationClick = (location: BoundarySearchResult) => {
+    // Calculate center from bbox if available, otherwise use geometry centroid
+    const center: [number, number] = location.bbox?.coordinates?.[0] ? [
+      (Math.min(...location.bbox.coordinates[0].map((c: number[]) => c[0])) + 
+       Math.max(...location.bbox.coordinates[0].map((c: number[]) => c[0]))) / 2,
+      (Math.min(...location.bbox.coordinates[0].map((c: number[]) => c[1])) + 
+       Math.max(...location.bbox.coordinates[0].map((c: number[]) => c[1]))) / 2
+    ] : [0, 0]; // fallback, should be calculated from geometry
+    
+    onLocationSelect(location.place_name, center, location.id);
     setQuery(location.place_name);
     setSuggestions([]);
   };
@@ -78,13 +71,19 @@ export const LocationSearch = ({ onLocationSelect, placeholder = "Search for a l
         <Card className="absolute top-full left-0 right-0 mt-1 z-50 max-h-60 overflow-y-auto">
           {suggestions.map((location) => (
             <Button
-              key={location.id || location.place_name}
+              key={location.id}
               variant="ghost"
               className="w-full justify-start text-left h-auto p-3 hover:bg-secondary"
               onClick={() => handleLocationClick(location)}
             >
               <MapPin className="h-4 w-4 mr-2 text-map-blue flex-shrink-0" />
-              <span className="truncate">{location.place_name}</span>
+              <div className="flex flex-col items-start">
+                <span className="truncate font-medium">{location.name}</span>
+                <span className="text-xs text-muted-foreground truncate">
+                  {location.country_code ? `${location.country_code.toUpperCase()} • ` : ''}
+                  Level {location.admin_level} • {location.area_km2?.toFixed(0)} km²
+                </span>
+              </div>
             </Button>
           ))}
         </Card>

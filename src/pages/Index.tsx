@@ -9,14 +9,18 @@ const Index = () => {
   const [baseLocationName, setBaseLocationName] = useState<string>("");
   const [overlayLocationName, setOverlayLocationName] = useState<string>("");
 
-  const handleBaseLocationSelect = (location: string, coordinates: [number, number]) => {
+  const handleBaseLocationSelect = (location: string, coordinates: [number, number], boundaryId?: number) => {
     setBaseLocation(coordinates);
     setBaseLocationName(location);
+    // Store boundary ID for efficient lookup later
+    (window as any).baseBoundaryId = boundaryId;
   };
 
-  const handleOverlayLocationSelect = (location: string, coordinates: [number, number]) => {
+  const handleOverlayLocationSelect = (location: string, coordinates: [number, number], boundaryId?: number) => {
     setOverlayLocation(coordinates);
     setOverlayLocationName(location);
+    // Store boundary ID for efficient lookup later
+    (window as any).overlayBoundaryId = boundaryId;
   };
 
   const handleReset = () => {
