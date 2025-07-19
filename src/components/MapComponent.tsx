@@ -124,7 +124,7 @@ export const MapComponent = ({
           type: "fill",
           source: "base-boundary",
           paint: {
-            "fill-color": "hsl(var(--map-blue))",
+            "fill-color": "#3b82f6",
             "fill-opacity": 0.1
           }
         });
@@ -134,14 +134,14 @@ export const MapComponent = ({
           type: "line",
           source: "base-boundary",
           paint: {
-            "line-color": "hsl(var(--map-blue))",
+            "line-color": "#3b82f6",
             "line-width": 2,
             "line-opacity": 0.8
           }
         });
 
         // Add center marker
-        new mapboxgl.Marker({ color: "hsl(var(--map-blue))" })
+        new mapboxgl.Marker({ color: "#3b82f6" })
           .setLngLat(baseLocation)
           .setPopup(
             new mapboxgl.Popup({ offset: 25 }).setHTML(
@@ -216,7 +216,7 @@ export const MapComponent = ({
           type: "fill",
           source: "overlay-boundary",
           paint: {
-            "fill-color": "hsl(var(--map-green))",
+            "fill-color": "#10b981",
             "fill-opacity": 0.2
           }
         });
@@ -226,7 +226,7 @@ export const MapComponent = ({
           type: "line",
           source: "overlay-boundary",
           paint: {
-            "line-color": "hsl(var(--map-green))",
+            "line-color": "#10b981",
             "line-width": 2,
             "line-opacity": 0.9,
             "line-dasharray": [2, 2]
@@ -234,7 +234,7 @@ export const MapComponent = ({
         });
 
         // Add overlay center marker
-        new mapboxgl.Marker({ color: "hsl(var(--map-green))" })
+        new mapboxgl.Marker({ color: "#10b981" })
           .setLngLat(baseBounds.center)
           .setPopup(
             new mapboxgl.Popup({ offset: 25 }).setHTML(

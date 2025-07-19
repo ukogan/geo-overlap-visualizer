@@ -82,9 +82,11 @@ export async function fetchLocationBoundary(
     }
 
     const data = await response.json();
+    console.log("Boundary API response:", data);
     
     if (data.features && data.features.length > 0) {
       const feature = data.features[0];
+      console.log("Feature geometry type:", feature.geometry?.type);
       
       if (feature.geometry && (feature.geometry.type === "Polygon" || feature.geometry.type === "MultiPolygon")) {
         const boundary: BoundaryData = {
@@ -121,6 +123,7 @@ export async function fetchLocationBoundary(
       }
     }
 
+    console.log("No polygon data found, creating fallback boundary");
     // Fallback: create a rough circular approximation
     return createFallbackBoundary(locationName, coordinates);
 
