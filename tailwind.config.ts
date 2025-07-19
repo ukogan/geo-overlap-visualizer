@@ -52,6 +52,11 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				// Geographic/cartographic colors
+				'map-blue': 'hsl(var(--map-blue))',
+				'map-green': 'hsl(var(--map-green))',
+				'map-earth': 'hsl(var(--map-earth))',
+				'map-overlay': 'hsl(var(--map-overlay))',
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
