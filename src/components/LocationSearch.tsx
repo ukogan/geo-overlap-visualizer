@@ -3,7 +3,6 @@ import { Search, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { MAPBOX_TOKEN } from "@/lib/config";
 
 interface LocationSearchProps {
   onLocationSelect: (location: string, coordinates: [number, number]) => void;
@@ -24,42 +23,29 @@ export const LocationSearch = ({ onLocationSelect, placeholder = "Search for a l
 
     setIsLoading(true);
     try {
-      // Using Mapbox Geocoding API - will need actual token in production
+      // Use Nominatim for search to match our boundary data source
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${MAPBOX_TOKEN}&types=place,region,country&limit=5`
+        `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&q=${encodeURIComponent(searchQuery)}`
       );
       
       if (response.ok) {
         const data = await response.json();
-        setSuggestions(data.features || []);
+        console.log("Nominatim search results:", data);
+        
+        // Transform Nominatim results to our format
+        const transformedResults = data.map((item: any) => ({
+          place_name: item.display_name,
+          center: [parseFloat(item.lon), parseFloat(item.lat)],
+          id: item.place_id,
+          osm_type: item.osm_type,
+          osm_id: item.osm_id
+        }));
+        
+        setSuggestions(transformedResults);
       }
     } catch (error) {
-      console.error("Error searching locations:", error);
-      // Fallback to mock data for demo
-      setSuggestions([
-        {
-          place_name: "Tokyo, Japan",
-          center: [139.6917, 35.6895],
-          id: "tokyo"
-        },
-        {
-          place_name: "San Francisco Bay Area, California, United States",
-          center: [-122.4194, 37.7749],
-          id: "bay-area"
-        },
-        {
-          place_name: "Switzerland",
-          center: [8.2275, 46.8182],
-          id: "switzerland"
-        },
-        {
-          place_name: "Rhode Island, United States",
-          center: [-71.5118, 41.6809],
-          id: "rhode-island"
-        }
-      ].filter(item => 
-        item.place_name.toLowerCase().includes(searchQuery.toLowerCase())
-      ));
+      console.error("Error searching locations with Nominatim:", error);
+      setSuggestions([]);
     } finally {
       setIsLoading(false);
     }

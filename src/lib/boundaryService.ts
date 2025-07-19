@@ -73,7 +73,8 @@ export async function fetchLocationBoundary(
 ): Promise<LocationBounds> {
   try {
     console.log("Fetching boundary for:", locationName);
-    // Use Nominatim API for actual polygon boundaries
+    // Use Nominatim API for actual polygon boundaries  
+    // Search using the exact location name to get consistent results
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?format=geojson&polygon_geojson=1&limit=1&q=${encodeURIComponent(locationName)}`
     );
