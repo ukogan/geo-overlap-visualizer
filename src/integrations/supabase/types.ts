@@ -19,9 +19,13 @@ export type Database = {
           admin_level: number | null
           area_km2: number | null
           bbox: unknown | null
+          bbox_geojson: Json | null
+          center_lat: number | null
+          center_lng: number | null
           country_code: string | null
           created_at: string | null
           geometry: unknown
+          geometry_geojson: Json | null
           id: number
           name: string
           name_long: string | null
@@ -32,9 +36,13 @@ export type Database = {
           admin_level?: number | null
           area_km2?: number | null
           bbox?: unknown | null
+          bbox_geojson?: Json | null
+          center_lat?: number | null
+          center_lng?: number | null
           country_code?: string | null
           created_at?: string | null
           geometry: unknown
+          geometry_geojson?: Json | null
           id?: number
           name: string
           name_long?: string | null
@@ -45,9 +53,13 @@ export type Database = {
           admin_level?: number | null
           area_km2?: number | null
           bbox?: unknown | null
+          bbox_geojson?: Json | null
+          center_lat?: number | null
+          center_lng?: number | null
           country_code?: string | null
           created_at?: string | null
           geometry?: unknown
+          geometry_geojson?: Json | null
           id?: number
           name?: string
           name_long?: string | null

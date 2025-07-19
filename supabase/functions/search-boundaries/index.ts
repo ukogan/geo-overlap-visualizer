@@ -26,7 +26,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
-    // Search for boundaries matching the query
+    // Search for boundaries matching the query using the new JSONB columns
     const { data: boundaries, error } = await supabaseClient
       .from('boundaries')
       .select(`
@@ -37,8 +37,8 @@ serve(async (req) => {
         country_code,
         area_km2,
         population,
-        ST_AsGeoJSON(geometry) as geometry_json,
-        ST_AsGeoJSON(bbox) as bbox_json
+        geometry_geojson,
+        bbox_geojson
       `)
       .or(`name.ilike.%${query}%,name_long.ilike.%${query}%`)
       .order('admin_level', { ascending: true })
@@ -62,8 +62,8 @@ serve(async (req) => {
       country_code: boundary.country_code,
       area_km2: boundary.area_km2,
       population: boundary.population,
-      geometry: boundary.geometry_json ? JSON.parse(boundary.geometry_json) : null,
-      bbox: boundary.bbox_json ? JSON.parse(boundary.bbox_json) : null
+      geometry: boundary.geometry_geojson,
+      bbox: boundary.bbox_geojson
     })) || []
 
     return new Response(

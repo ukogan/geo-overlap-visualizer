@@ -1,1 +1,7 @@
 project_id = "rlyyvkcqtpzllzkllypi"
+
+[functions.search-boundaries]
+verify_jwt = false
+
+[functions.get-boundary]
+verify_jwt = false

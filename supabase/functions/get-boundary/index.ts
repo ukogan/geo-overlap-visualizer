@@ -36,10 +36,10 @@ serve(async (req) => {
         country_code,
         area_km2,
         population,
-        ST_AsGeoJSON(geometry) as geometry_json,
-        ST_AsGeoJSON(bbox) as bbox_json,
-        ST_X(ST_Centroid(geometry)) as center_lng,
-        ST_Y(ST_Centroid(geometry)) as center_lat
+        geometry_geojson,
+        bbox_geojson,
+        center_lng,
+        center_lat
       `)
 
     if (id) {
@@ -48,7 +48,7 @@ serve(async (req) => {
       query = query.eq('name', name)
     }
 
-    const { data: boundaries, error } = await query.single()
+    const { data: boundary, error } = await query.single()
 
     if (error) {
       console.error('Database error:', error)
@@ -62,29 +62,35 @@ serve(async (req) => {
     const feature = {
       type: "Feature",
       properties: {
-        name: boundaries.name_long || boundaries.name,
-        admin_level: boundaries.admin_level,
-        country_code: boundaries.country_code,
-        area: boundaries.area_km2,
-        population: boundaries.population,
-        center: [boundaries.center_lng, boundaries.center_lat]
+        name: boundary.name_long || boundary.name,
+        admin_level: boundary.admin_level,
+        country_code: boundary.country_code,
+        area: boundary.area_km2,
+        population: boundary.population,
+        center: [boundary.center_lng, boundary.center_lat]
       },
-      geometry: boundaries.geometry_json ? JSON.parse(boundaries.geometry_json) : null
+      geometry: boundary.geometry_geojson
     }
 
-    const bbox = boundaries.bbox_json ? JSON.parse(boundaries.bbox_json) : null
-    const center = [boundaries.center_lng, boundaries.center_lat]
+    const center = [boundary.center_lng, boundary.center_lat]
+    
+    // Calculate bbox from geometry if bbox_geojson exists
+    let bbox = null
+    if (boundary.bbox_geojson && boundary.bbox_geojson.coordinates?.[0]) {
+      const coords = boundary.bbox_geojson.coordinates[0]
+      bbox = [
+        Math.min(...coords.map((c: number[]) => c[0])),
+        Math.min(...coords.map((c: number[]) => c[1])),
+        Math.max(...coords.map((c: number[]) => c[0])),
+        Math.max(...coords.map((c: number[]) => c[1]))
+      ]
+    }
 
     return new Response(
       JSON.stringify({
         boundary: feature,
         center,
-        bbox: bbox?.coordinates?.[0] ? [
-          Math.min(...bbox.coordinates[0].map((c: number[]) => c[0])),
-          Math.min(...bbox.coordinates[0].map((c: number[]) => c[1])),
-          Math.max(...bbox.coordinates[0].map((c: number[]) => c[0])),
-          Math.max(...bbox.coordinates[0].map((c: number[]) => c[1]))
-        ] : null
+        bbox
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
