@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -23,6 +24,7 @@ export const MapComponent = ({
   const [baseBounds, setBaseBounds] = useState<LocationBounds | null>(null);
   const [overlayBounds, setOverlayBounds] = useState<LocationBounds | null>(null);
   const [isLoadingBoundaries, setIsLoadingBoundaries] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -74,7 +76,13 @@ export const MapComponent = ({
       );
 
       map.current.on("load", () => {
+        console.log("Map loaded successfully");
+        setMapLoaded(true);
         toast("Map loaded! Select locations to compare.");
+      });
+
+      map.current.on("error", (e) => {
+        console.error("Map error:", e);
       });
 
     } catch (error) {
@@ -89,156 +97,190 @@ export const MapComponent = ({
 
   // Load base location boundary
   useEffect(() => {
-    if (map.current && baseLocation && baseLocationName && mapboxToken) {
-      setIsLoadingBoundaries(true);
-      
-      fetchLocationBoundary(baseLocationName, baseLocation, mapboxToken)
-        .then((bounds) => {
-          setBaseBounds(bounds);
-          
-          // Fit map to base boundary
-          map.current?.fitBounds(bounds.bbox, {
-            padding: { top: 50, bottom: 50, left: 50, right: 50 },
-            duration: 2000
-          });
-          
-          // Add base boundary to map
-          if (map.current?.getSource("base-boundary")) {
-            map.current.removeLayer("base-boundary-fill");
-            map.current.removeLayer("base-boundary-line");
-            map.current.removeSource("base-boundary");
-          }
-          
-          map.current?.addSource("base-boundary", {
-            type: "geojson",
-            data: bounds.boundary
-          });
-          
-          map.current?.addLayer({
-            id: "base-boundary-fill",
-            type: "fill",
-            source: "base-boundary",
-            paint: {
-              "fill-color": "hsl(var(--map-blue))",
-              "fill-opacity": 0.1
-            }
-          });
-          
-          map.current?.addLayer({
-            id: "base-boundary-line",
-            type: "line",
-            source: "base-boundary",
-            paint: {
-              "line-color": "hsl(var(--map-blue))",
-              "line-width": 2,
-              "line-opacity": 0.8
-            }
-          });
-
-          // Add center marker
-          new mapboxgl.Marker({ color: "hsl(var(--map-blue))" })
-            .setLngLat(baseLocation)
-            .setPopup(
-              new mapboxgl.Popup({ offset: 25 }).setHTML(
-                `<div class="font-medium">${baseLocationName}</div>
-                 <div class="text-sm text-gray-600">Base Location</div>
-                 <div class="text-xs text-gray-500">Area: ${bounds.boundary.properties.area?.toFixed(0)} km²</div>`
-              )
-            )
-            .addTo(map.current!);
-        })
-        .catch((error) => {
-          console.error("Error loading base boundary:", error);
-          toast.error(`Failed to load boundary for ${baseLocationName}`);
-        })
-        .finally(() => {
-          setIsLoadingBoundaries(false);
-        });
+    if (!mapLoaded || !map.current || !baseLocation || !baseLocationName || !mapboxToken) {
+      console.log("Base boundary loading skipped - requirements not met:", {
+        mapLoaded,
+        hasMap: !!map.current,
+        baseLocation,
+        baseLocationName,
+        mapboxToken: !!mapboxToken
+      });
+      return;
     }
-  }, [baseLocation, baseLocationName, mapboxToken]);
+    
+    console.log("Loading base boundary for:", baseLocationName);
+    setIsLoadingBoundaries(true);
+    
+    fetchLocationBoundary(baseLocationName, baseLocation, mapboxToken)
+      .then((bounds) => {
+        console.log("Base boundary loaded:", bounds);
+        setBaseBounds(bounds);
+        
+        // Fit map to base boundary
+        map.current?.fitBounds(bounds.bbox, {
+          padding: { top: 50, bottom: 50, left: 50, right: 50 },
+          duration: 2000
+        });
+        
+        // Remove existing base boundary layers if they exist
+        if (map.current?.getSource("base-boundary")) {
+          if (map.current.getLayer("base-boundary-fill")) {
+            map.current.removeLayer("base-boundary-fill");
+          }
+          if (map.current.getLayer("base-boundary-line")) {
+            map.current.removeLayer("base-boundary-line");
+          }
+          map.current.removeSource("base-boundary");
+        }
+        
+        // Add base boundary to map
+        map.current?.addSource("base-boundary", {
+          type: "geojson",
+          data: bounds.boundary
+        });
+        
+        map.current?.addLayer({
+          id: "base-boundary-fill",
+          type: "fill",
+          source: "base-boundary",
+          paint: {
+            "fill-color": "hsl(var(--map-blue))",
+            "fill-opacity": 0.1
+          }
+        });
+        
+        map.current?.addLayer({
+          id: "base-boundary-line",
+          type: "line",
+          source: "base-boundary",
+          paint: {
+            "line-color": "hsl(var(--map-blue))",
+            "line-width": 2,
+            "line-opacity": 0.8
+          }
+        });
+
+        // Add center marker
+        new mapboxgl.Marker({ color: "hsl(var(--map-blue))" })
+          .setLngLat(baseLocation)
+          .setPopup(
+            new mapboxgl.Popup({ offset: 25 }).setHTML(
+              `<div class="font-medium">${baseLocationName}</div>
+               <div class="text-sm text-gray-600">Base Location</div>
+               <div class="text-xs text-gray-500">Area: ${bounds.boundary.properties.area?.toFixed(0)} km²</div>`
+            )
+          )
+          .addTo(map.current!);
+      })
+      .catch((error) => {
+        console.error("Error loading base boundary:", error);
+        toast.error(`Failed to load boundary for ${baseLocationName}`);
+      })
+      .finally(() => {
+        setIsLoadingBoundaries(false);
+      });
+  }, [baseLocation, baseLocationName, mapboxToken, mapLoaded]);
 
   // Load overlay location boundary and create overlay
   useEffect(() => {
-    if (map.current && overlayLocation && overlayLocationName && mapboxToken && baseBounds) {
-      setIsLoadingBoundaries(true);
-      
-      fetchLocationBoundary(overlayLocationName, overlayLocation, mapboxToken)
-        .then((bounds) => {
-          setOverlayBounds(bounds);
-          
-          // Calculate scale ratio (how much to scale overlay to match base)
-          const scaleRatio = calculateScaleRatio(baseBounds, bounds);
-          
-          // Transform overlay geometry to fit over base location
-          const transformedOverlay = transformOverlayGeometry(
-            bounds, 
-            baseBounds.center, 
-            scaleRatio
-          );
-          
-          // Remove existing overlay layers
-          if (map.current?.getSource("overlay-boundary")) {
-            map.current.removeLayer("overlay-boundary-fill");
-            map.current.removeLayer("overlay-boundary-line");
-            map.current.removeSource("overlay-boundary");
-          }
-          
-          // Add transformed overlay to map
-          map.current?.addSource("overlay-boundary", {
-            type: "geojson",
-            data: transformedOverlay
-          });
-          
-          map.current?.addLayer({
-            id: "overlay-boundary-fill",
-            type: "fill",
-            source: "overlay-boundary",
-            paint: {
-              "fill-color": "hsl(var(--map-green))",
-              "fill-opacity": 0.2
-            }
-          });
-          
-          map.current?.addLayer({
-            id: "overlay-boundary-line",
-            type: "line",
-            source: "overlay-boundary",
-            paint: {
-              "line-color": "hsl(var(--map-green))",
-              "line-width": 2,
-              "line-opacity": 0.9,
-              "line-dasharray": [2, 2]
-            }
-          });
-
-          // Add overlay center marker
-          new mapboxgl.Marker({ color: "hsl(var(--map-green))" })
-            .setLngLat(baseBounds.center)
-            .setPopup(
-              new mapboxgl.Popup({ offset: 25 }).setHTML(
-                `<div class="font-medium">${overlayLocationName}</div>
-                 <div class="text-sm text-gray-600">Overlay Location</div>
-                 <div class="text-xs text-gray-500">Area: ${bounds.boundary.properties.area?.toFixed(0)} km²</div>
-                 <div class="text-xs text-gray-500">Scale: ${scaleRatio.toFixed(2)}x</div>`
-              )
-            )
-            .addTo(map.current!);
-
-          const areaRatio = (baseBounds.boundary.properties.area || 1) / (bounds.boundary.properties.area || 1);
-          toast.success(
-            `${overlayLocationName} overlaid on ${baseLocationName}. Area ratio: ${areaRatio.toFixed(1)}:1`,
-            { duration: 4000 }
-          );
-        })
-        .catch((error) => {
-          console.error("Error loading overlay boundary:", error);
-          toast.error(`Failed to load boundary for ${overlayLocationName}`);
-        })
-        .finally(() => {
-          setIsLoadingBoundaries(false);
-        });
+    if (!mapLoaded || !map.current || !overlayLocation || !overlayLocationName || !mapboxToken || !baseBounds) {
+      console.log("Overlay loading skipped - requirements not met:", {
+        mapLoaded,
+        hasMap: !!map.current,
+        overlayLocation,
+        overlayLocationName,
+        mapboxToken: !!mapboxToken,
+        baseBounds: !!baseBounds
+      });
+      return;
     }
-  }, [overlayLocation, overlayLocationName, mapboxToken, baseBounds]);
+    
+    console.log("Loading overlay boundary for:", overlayLocationName);
+    setIsLoadingBoundaries(true);
+    
+    fetchLocationBoundary(overlayLocationName, overlayLocation, mapboxToken)
+      .then((bounds) => {
+        console.log("Overlay boundary loaded:", bounds);
+        setOverlayBounds(bounds);
+        
+        // Calculate scale ratio (how much to scale overlay to match base)
+        const scaleRatio = calculateScaleRatio(baseBounds, bounds);
+        console.log("Scale ratio calculated:", scaleRatio);
+        
+        // Transform overlay geometry to fit over base location
+        const transformedOverlay = transformOverlayGeometry(
+          bounds, 
+          baseBounds.center, 
+          scaleRatio
+        );
+        console.log("Transformed overlay:", transformedOverlay);
+        
+        // Remove existing overlay layers if they exist
+        if (map.current?.getSource("overlay-boundary")) {
+          if (map.current.getLayer("overlay-boundary-fill")) {
+            map.current.removeLayer("overlay-boundary-fill");
+          }
+          if (map.current.getLayer("overlay-boundary-line")) {
+            map.current.removeLayer("overlay-boundary-line");
+          }
+          map.current.removeSource("overlay-boundary");
+        }
+        
+        // Add transformed overlay to map
+        map.current?.addSource("overlay-boundary", {
+          type: "geojson",
+          data: transformedOverlay
+        });
+        
+        map.current?.addLayer({
+          id: "overlay-boundary-fill",
+          type: "fill",
+          source: "overlay-boundary",
+          paint: {
+            "fill-color": "hsl(var(--map-green))",
+            "fill-opacity": 0.2
+          }
+        });
+        
+        map.current?.addLayer({
+          id: "overlay-boundary-line",
+          type: "line",
+          source: "overlay-boundary",
+          paint: {
+            "line-color": "hsl(var(--map-green))",
+            "line-width": 2,
+            "line-opacity": 0.9,
+            "line-dasharray": [2, 2]
+          }
+        });
+
+        // Add overlay center marker
+        new mapboxgl.Marker({ color: "hsl(var(--map-green))" })
+          .setLngLat(baseBounds.center)
+          .setPopup(
+            new mapboxgl.Popup({ offset: 25 }).setHTML(
+              `<div class="font-medium">${overlayLocationName}</div>
+               <div class="text-sm text-gray-600">Overlay Location</div>
+               <div class="text-xs text-gray-500">Area: ${bounds.boundary.properties.area?.toFixed(0)} km²</div>
+               <div class="text-xs text-gray-500">Scale: ${scaleRatio.toFixed(2)}x</div>`
+            )
+          )
+          .addTo(map.current!);
+
+        const areaRatio = (baseBounds.boundary.properties.area || 1) / (bounds.boundary.properties.area || 1);
+        toast.success(
+          `${overlayLocationName} overlaid on ${baseLocationName}. Area ratio: ${areaRatio.toFixed(1)}:1`,
+          { duration: 4000 }
+        );
+      })
+      .catch((error) => {
+        console.error("Error loading overlay boundary:", error);
+        toast.error(`Failed to load boundary for ${overlayLocationName}`);
+      })
+      .finally(() => {
+        setIsLoadingBoundaries(false);
+      });
+  }, [overlayLocation, overlayLocationName, mapboxToken, baseBounds, mapLoaded]);
 
   return (
     <div className="relative w-full h-full">
