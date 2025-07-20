@@ -74,17 +74,28 @@ export const LocationStep = ({
 
       const results = data.features || [];
       
+      
       if (results.length > 0) {
-        // If we found results, it means the data exists
-        return {
-          existing: results.map((result: any) => ({
-            name: result.name || result.place_name,
-            coordinates: [result.bbox ? (result.bbox[0] + result.bbox[2]) / 2 : 0, 
-                         result.bbox ? (result.bbox[1] + result.bbox[3]) / 2 : 0] as [number, number],
-            id: result.id.toString(),
-            area_km2: result.area_km2
-          }))
-        };
+        // Separate local vs external results
+        const localResults = results.filter((result: any) => result.id !== null && result.source === 'local');
+        
+        if (localResults.length > 0) {
+          // If we found local results, use them
+          return {
+            existing: localResults.map((result: any) => ({
+              name: result.name || result.place_name,
+              coordinates: result.center || [
+                result.bbox ? (result.bbox[0] + result.bbox[2]) / 2 : 0, 
+                result.bbox ? (result.bbox[1] + result.bbox[3]) / 2 : 0
+              ] as [number, number],
+              id: result.id.toString(),
+              area_km2: result.area_km2
+            }))
+          };
+        }
+        
+        // If only external results, we need to download data
+        // Don't return them as "existing" since they're not in our database
       }
 
       // Also check the city_boundaries table for stored data
