@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Database, MapPin, Calendar } from "lucide-react";
+import { Database, MapPin, Calendar, Trash2, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 interface CityData {
   id: string;
@@ -27,6 +28,8 @@ interface DatabaseViewerProps {
 export const DatabaseViewer = ({ onLocationSelect, selectedLocationId }: DatabaseViewerProps) => {
   const [cities, setCities] = useState<CityData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingStates, setLoadingStates] = useState<Record<string, 'deleting' | 'refreshing' | null>>({});
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchCities();
@@ -72,6 +75,78 @@ export const DatabaseViewer = ({ onLocationSelect, selectedLocationId }: Databas
   const handleUseLocation = (city: CityData, action: 'base' | 'overlay' = 'base') => {
     if (onLocationSelect && city.center_lat && city.center_lng) {
       onLocationSelect(city.name, [city.center_lng, city.center_lat], parseInt(city.id));
+    }
+  };
+
+  const handleDeleteCity = async (city: CityData) => {
+    setLoadingStates(prev => ({ ...prev, [city.id]: 'deleting' }));
+    
+    try {
+      const { error } = await supabase
+        .from('city_boundaries')
+        .delete()
+        .eq('id', city.id);
+
+      if (error) throw error;
+
+      setCities(prev => prev.filter(c => c.id !== city.id));
+      toast({
+        title: "City deleted",
+        description: `${city.name} has been removed from the database.`,
+      });
+    } catch (error) {
+      console.error('Error deleting city:', error);
+      toast({
+        title: "Error deleting city",
+        description: "There was an error removing the city from the database.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [city.id]: null }));
+    }
+  };
+
+  const handleRefreshCity = async (city: CityData) => {
+    setLoadingStates(prev => ({ ...prev, [city.id]: 'refreshing' }));
+    
+    try {
+      // First delete the existing entry
+      const { error: deleteError } = await supabase
+        .from('city_boundaries')
+        .delete()
+        .eq('id', city.id);
+
+      if (deleteError) throw deleteError;
+
+      // Re-download the data
+      const { data, error } = await supabase.functions.invoke('fetch-osm-boundaries', {
+        body: {
+          cities: [{
+            name: city.name,
+            country: city.country_code || "US",
+            adminLevel: city.admin_level || 8
+          }]
+        }
+      });
+
+      if (error) throw error;
+
+      // Refresh the cities list
+      await fetchCities();
+      
+      toast({
+        title: "City refreshed",
+        description: `${city.name} boundary data has been re-downloaded.`,
+      });
+    } catch (error) {
+      console.error('Error refreshing city:', error);
+      toast({
+        title: "Error refreshing city",
+        description: "There was an error re-downloading the boundary data.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingStates(prev => ({ ...prev, [city.id]: null }));
     }
   };
 
@@ -158,16 +233,60 @@ export const DatabaseViewer = ({ onLocationSelect, selectedLocationId }: Databas
                     </div>
                   </div>
                   
-                  {onLocationSelect && city.center_lat && city.center_lng && (
-                    <Button 
-                      onClick={() => handleUseLocation(city)}
-                      className="w-full"
-                      size="sm"
-                    >
-                      <MapPin className="h-3 w-3 mr-2" />
-                      Use for Comparison
-                    </Button>
-                  )}
+                  <div className="space-y-2">
+                    {onLocationSelect && city.center_lat && city.center_lng && (
+                      <Button 
+                        onClick={() => handleUseLocation(city)}
+                        className="w-full"
+                        size="sm"
+                      >
+                        <MapPin className="h-3 w-3 mr-2" />
+                        Use for Comparison
+                      </Button>
+                    )}
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleRefreshCity(city)}
+                        disabled={loadingStates[city.id] === 'refreshing'}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                      >
+                        {loadingStates[city.id] === 'refreshing' ? (
+                          <>
+                            <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                            Refreshing...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-3 w-3 mr-2" />
+                            Refresh
+                          </>
+                        )}
+                      </Button>
+                      
+                      <Button
+                        onClick={() => handleDeleteCity(city)}
+                        disabled={loadingStates[city.id] === 'deleting'}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      >
+                        {loadingStates[city.id] === 'deleting' ? (
+                          <>
+                            <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-3 w-3 mr-2" />
+                            Delete
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
