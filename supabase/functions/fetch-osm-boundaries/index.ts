@@ -69,13 +69,12 @@ serve(async (req) => {
             out geom;
           `;
         } else {
-          if (city.name === "New York") {
+          if (city.name === "New York" || city.name === "New York Metropolitan Area") {
             overpassQuery = `
               [out:json][timeout:120];
               (
-                rel["name"~"New York",i]["type"="boundary"]["boundary"="administrative"]["admin_level"~"[4-6]"];
-                rel["name"~"New York Metropolitan",i]["type"="boundary"];
-                rel["name"~"Greater New York",i]["type"="boundary"];
+                rel["name"~"New York City",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="New York City"]["type"="boundary"];
                 rel(175905);
                 >;
               );
