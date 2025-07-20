@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { getBoundaryData, searchBoundaries, BoundarySearchResult } from '@/lib/supabaseBoundaryService';
 import { LocationBounds } from '@/lib/supabaseBoundaryService';
@@ -8,13 +9,19 @@ export interface BoundaryState {
   coordinates: [number, number];
   bounds?: LocationBounds;
   isLoading: boolean;
+  lastUpdated?: string;
 }
 
 export interface OSMFetchResult {
   name: string;
   success: boolean;
   coordinateCount?: number;
+  beforePoints?: number;
+  afterPoints?: number;
   error?: string;
+  rings?: number;
+  areaKm2?: number;
+  relationId?: string;
 }
 
 export function useBoundaryData() {
@@ -47,12 +54,18 @@ export function useBoundaryData() {
       id,
       name,
       coordinates,
-      isLoading: true
+      isLoading: true,
+      lastUpdated: new Date().toISOString()
     });
 
     try {
       const bounds = await getBoundaryData(id || null, name);
-      setBaseLocation(prev => prev ? { ...prev, bounds, isLoading: false } : null);
+      setBaseLocation(prev => prev ? { 
+        ...prev, 
+        bounds, 
+        isLoading: false,
+        lastUpdated: new Date().toISOString()
+      } : null);
     } catch (error) {
       console.error('Error loading base boundary:', error);
       setBaseLocation(prev => prev ? { ...prev, isLoading: false } : null);
@@ -64,12 +77,18 @@ export function useBoundaryData() {
       id,
       name,
       coordinates,
-      isLoading: true
+      isLoading: true,
+      lastUpdated: new Date().toISOString()
     });
 
     try {
       const bounds = await getBoundaryData(id || null, name);
-      setOverlayLocation(prev => prev ? { ...prev, bounds, isLoading: false } : null);
+      setOverlayLocation(prev => prev ? { 
+        ...prev, 
+        bounds, 
+        isLoading: false,
+        lastUpdated: new Date().toISOString()
+      } : null);
     } catch (error) {
       console.error('Error loading overlay boundary:', error);
       setOverlayLocation(prev => prev ? { ...prev, isLoading: false } : null);
@@ -84,27 +103,50 @@ export function useBoundaryData() {
   }, []);
 
   const refreshBoundaryData = useCallback(async () => {
-    // Reload current boundary data to pick up any OSM updates
+    console.log('Refreshing boundary data...');
+    
+    // Force reload both locations if they exist
     if (baseLocation && !baseLocation.isLoading) {
+      console.log('Refreshing base location:', baseLocation.name);
+      setBaseLocation(prev => prev ? { ...prev, isLoading: true } : null);
+      
       try {
         const bounds = await getBoundaryData(baseLocation.id || null, baseLocation.name);
-        setBaseLocation(prev => prev ? { ...prev, bounds } : null);
+        setBaseLocation(prev => prev ? { 
+          ...prev, 
+          bounds, 
+          isLoading: false,
+          lastUpdated: new Date().toISOString()
+        } : null);
+        console.log('Base location refreshed successfully');
       } catch (error) {
         console.error('Error refreshing base boundary:', error);
+        setBaseLocation(prev => prev ? { ...prev, isLoading: false } : null);
       }
     }
 
     if (overlayLocation && !overlayLocation.isLoading) {
+      console.log('Refreshing overlay location:', overlayLocation.name);
+      setOverlayLocation(prev => prev ? { ...prev, isLoading: true } : null);
+      
       try {
         const bounds = await getBoundaryData(overlayLocation.id || null, overlayLocation.name);
-        setOverlayLocation(prev => prev ? { ...prev, bounds } : null);
+        setOverlayLocation(prev => prev ? { 
+          ...prev, 
+          bounds, 
+          isLoading: false,
+          lastUpdated: new Date().toISOString()
+        } : null);
+        console.log('Overlay location refreshed successfully');
       } catch (error) {
         console.error('Error refreshing overlay boundary:', error);
+        setOverlayLocation(prev => prev ? { ...prev, isLoading: false } : null);
       }
     }
   }, [baseLocation, overlayLocation]);
 
   const setOsmResults = useCallback((results: OSMFetchResult[]) => {
+    console.log('Setting OSM results:', results);
     setOsmFetchResults(results);
   }, []);
 

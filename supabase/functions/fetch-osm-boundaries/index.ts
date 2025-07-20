@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -45,52 +46,54 @@ serve(async (req) => {
       try {
         console.log(`Processing: ${city.name}`);
         
+        // Get current boundary data for comparison
+        const { data: existingBoundary } = await supabase
+          .from('boundaries')
+          .select('name, geometry_geojson')
+          .eq('name', city.name)
+          .single();
+
+        const currentPointCount = existingBoundary?.geometry_geojson ? 
+          JSON.stringify(existingBoundary.geometry_geojson).length : 0;
+
         // Build Overpass query for the city
         let overpassQuery = '';
         
         if (city.relationId) {
-          // If we have a specific relation ID, use it directly
           overpassQuery = `
-            [out:json][timeout:60];
+            [out:json][timeout:120];
             rel(${city.relationId});
             out geom;
           `;
         } else {
-          // For US metropolitan areas, try multiple search strategies
           if (city.name === "New York") {
-            // Try specific relation ID for NYC metro area
             overpassQuery = `
-              [out:json][timeout:60];
+              [out:json][timeout:120];
               (
                 rel["name"~"New York",i]["type"="boundary"]["boundary"="administrative"]["admin_level"~"[4-6]"];
                 rel["name"~"New York Metropolitan",i]["type"="boundary"];
                 rel["name"~"Greater New York",i]["type"="boundary"];
-                rel["name"~"New York City",i]["type"="boundary"]["boundary"="administrative"];
                 rel(175905);
               );
               out geom;
             `;
           } else if (city.name === "Chicago") {
-            // Try specific approaches for Chicago metro area
             overpassQuery = `
-              [out:json][timeout:60];
+              [out:json][timeout:120];
               (
                 rel["name"~"Chicago",i]["type"="boundary"]["boundary"="administrative"]["admin_level"~"[4-6]"];
                 rel["name"~"Chicago Metropolitan",i]["type"="boundary"];
                 rel["name"~"Greater Chicago",i]["type"="boundary"];
-                rel["name"~"Chicagoland",i]["type"="boundary"];
                 rel(122604);
               );
               out geom;
             `;
           } else {
-            // Generic search for other cities
-            const searchName = city.name.toLowerCase();
             const countryFilter = city.country ? `["ISO3166-1"="${city.country}"]` : '';
             const adminLevelFilter = city.adminLevel ? `["admin_level"="${city.adminLevel}"]` : '';
             
             overpassQuery = `
-              [out:json][timeout:60];
+              [out:json][timeout:120];
               (
                 rel["name"~"${city.name}",i]["type"="boundary"]["boundary"="administrative"]${countryFilter}${adminLevelFilter};
                 rel["name"~"${city.name} Metropolitan",i]["type"="boundary"];
@@ -115,6 +118,13 @@ serve(async (req) => {
 
         if (!overpassResponse.ok) {
           console.error(`Overpass API error for ${city.name}:`, overpassResponse.status);
+          results.push({
+            name: city.name,
+            success: false,
+            error: `Overpass API error: ${overpassResponse.status}`,
+            beforePoints: currentPointCount,
+            afterPoints: 0
+          });
           continue;
         }
 
@@ -123,13 +133,27 @@ serve(async (req) => {
 
         if (!overpassData.elements || overpassData.elements.length === 0) {
           console.log(`No boundary data found for ${city.name}`);
+          results.push({
+            name: city.name,
+            success: false,
+            error: 'No boundary data found in OSM',
+            beforePoints: currentPointCount,
+            afterPoints: 0
+          });
           continue;
         }
 
-        // Find the best matching relation (usually the largest or most detailed one)
+        // Find the best matching relation
         const relations = overpassData.elements.filter((el: any) => el.type === 'relation');
         if (relations.length === 0) {
           console.log(`No relations found for ${city.name}`);
+          results.push({
+            name: city.name,
+            success: false,
+            error: 'No relations found',
+            beforePoints: currentPointCount,
+            afterPoints: 0
+          });
           continue;
         }
 
@@ -139,38 +163,84 @@ serve(async (req) => {
 
         console.log(`Selected relation ${bestRelation.id} for ${city.name} with ${bestRelation.members?.length || 0} members`);
 
-        // Convert OSM relation to GeoJSON
-        const coordinates = [];
-        
+        // Process geometry data more carefully
+        const wayMap = new Map();
+        const nodeMap = new Map();
+
+        // Index all ways and nodes
+        overpassData.elements.forEach((element: any) => {
+          if (element.type === 'way') {
+            wayMap.set(element.id, element);
+          } else if (element.type === 'node') {
+            nodeMap.set(element.id, element);
+          }
+        });
+
+        // Build coordinate rings
+        const outerRings: number[][][] = [];
+        const innerRings: number[][][] = [];
+
         if (bestRelation.members) {
           for (const member of bestRelation.members) {
-            if (member.type === 'way' && (member.role === 'outer' || member.role === '' || !member.role)) {
-              const way = overpassData.elements.find((el: any) => el.type === 'way' && el.id === member.ref);
-              if (way && way.geometry && way.geometry.length > 0) {
-                const wayCoords = way.geometry.map((node: any) => [node.lon, node.lat]);
-                if (wayCoords.length > 2) { // Only include ways with at least 3 points
-                  coordinates.push(wayCoords);
+            if (member.type === 'way') {
+              const way = wayMap.get(member.ref);
+              if (way && way.geometry && way.geometry.length > 2) {
+                const coords = way.geometry.map((node: any) => [node.lon, node.lat]);
+                
+                if (member.role === 'outer' || member.role === '' || !member.role) {
+                  outerRings.push(coords);
+                } else if (member.role === 'inner') {
+                  innerRings.push(coords);
                 }
               }
             }
           }
         }
 
-        console.log(`Extracted ${coordinates.length} coordinate rings for ${city.name}`);
+        console.log(`Extracted ${outerRings.length} outer rings and ${innerRings.length} inner rings for ${city.name}`);
 
-        if (coordinates.length === 0) {
-          console.log(`No valid coordinates found for ${city.name}`);
+        if (outerRings.length === 0) {
+          console.log(`No valid outer rings found for ${city.name}`);
+          results.push({
+            name: city.name,
+            success: false,
+            error: 'No valid geometry rings found',
+            beforePoints: currentPointCount,
+            afterPoints: 0
+          });
           continue;
         }
 
-        // Create GeoJSON
+        // Create proper MultiPolygon structure
+        const polygons = outerRings.map(outerRing => {
+          const polygon = [outerRing];
+          // Add any inner rings that might belong to this outer ring
+          innerRings.forEach(innerRing => {
+            polygon.push(innerRing);
+          });
+          return polygon;
+        });
+
         const geoJson = {
           type: "MultiPolygon",
-          coordinates: [coordinates]
+          coordinates: polygons
         };
 
-        // Calculate center and bounding box
-        const allCoords = coordinates.flat();
+        // Calculate statistics
+        const allCoords = polygons.flat(2);
+        const totalPoints = allCoords.length;
+        
+        if (totalPoints === 0) {
+          results.push({
+            name: city.name,
+            success: false,
+            error: 'No coordinate points extracted',
+            beforePoints: currentPointCount,
+            afterPoints: 0
+          });
+          continue;
+        }
+
         const lngs = allCoords.map(coord => coord[0]);
         const lats = allCoords.map(coord => coord[1]);
         
@@ -187,15 +257,14 @@ serve(async (req) => {
           coordinates: [[[minLng, minLat], [maxLng, minLat], [maxLng, maxLat], [minLng, maxLat], [minLng, minLat]]]
         };
 
-        // Calculate approximate area (rough estimation)
-        const areaKm2 = Math.abs((maxLng - minLng) * (maxLat - minLat)) * 111 * 111; // Very rough approximation
+        // Calculate approximate area
+        const areaKm2 = Math.abs((maxLng - minLng) * (maxLat - minLat)) * 111 * 111;
 
-        // Update or insert boundary data
+        // Update boundary data with proper PostGIS geometry
         const { error: upsertError } = await supabase
           .from('boundaries')
           .upsert({
             name: city.name,
-            geometry: `SRID=4326;${JSON.stringify(geoJson)}`,
             geometry_geojson: geoJson,
             bbox_geojson: bbox,
             center_lng: centerLng,
@@ -210,25 +279,37 @@ serve(async (req) => {
 
         if (upsertError) {
           console.error(`Database error for ${city.name}:`, upsertError);
+          results.push({
+            name: city.name,
+            success: false,
+            error: `Database error: ${upsertError.message}`,
+            beforePoints: currentPointCount,
+            afterPoints: 0
+          });
           continue;
         }
 
         results.push({
           name: city.name,
           success: true,
-          coordinateCount: allCoords.length,
+          coordinateCount: totalPoints,
+          beforePoints: currentPointCount,
+          afterPoints: totalPoints,
           relationId: bestRelation.id,
-          areaKm2: areaKm2
+          areaKm2: Math.round(areaKm2),
+          rings: outerRings.length
         });
 
-        console.log(`Successfully processed ${city.name} with ${allCoords.length} coordinate points`);
+        console.log(`Successfully processed ${city.name} with ${totalPoints} coordinate points (${outerRings.length} rings)`);
 
       } catch (error) {
         console.error(`Error processing ${city.name}:`, error);
         results.push({
           name: city.name,
           success: false,
-          error: error.message || 'Unknown error'
+          error: error.message || 'Unknown error',
+          beforePoints: 0,
+          afterPoints: 0
         });
       }
     }
@@ -237,7 +318,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         results,
-        message: `Processed ${results.length} cities` 
+        message: `Processed ${results.length} cities. ${results.filter(r => r.success).length} successful.` 
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

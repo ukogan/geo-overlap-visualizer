@@ -10,13 +10,15 @@ interface MapComponentProps {
   overlayLocation?: [number, number];
   baseLocationName?: string;
   overlayLocationName?: string;
+  refreshKey?: number;
 }
 
 export const MapComponent = ({ 
   baseLocation, 
   overlayLocation, 
   baseLocationName, 
-  overlayLocationName 
+  overlayLocationName,
+  refreshKey = 0
 }: MapComponentProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -24,11 +26,13 @@ export const MapComponent = ({
   const [overlayBounds, setOverlayBounds] = useState<LocationBounds | null>(null);
   const [isLoadingBoundaries, setIsLoadingBoundaries] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const baseMarker = useRef<mapboxgl.Marker | null>(null);
+  const overlayMarker = useRef<mapboxgl.Marker | null>(null);
 
+  // Initialize map
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    // Import MAPBOX_TOKEN locally to avoid build issues
     import("@/lib/config").then(({ MAPBOX_TOKEN }) => {
       mapboxgl.accessToken = MAPBOX_TOKEN;
 
@@ -41,7 +45,6 @@ export const MapComponent = ({
           attributionControl: false,
         });
 
-        // Add navigation controls
         map.current.addControl(
           new mapboxgl.NavigationControl({
             visualizePitch: false,
@@ -49,7 +52,6 @@ export const MapComponent = ({
           "top-right"
         );
 
-        // Add attribution
         map.current.addControl(
           new mapboxgl.AttributionControl({
             compact: true,
@@ -76,6 +78,8 @@ export const MapComponent = ({
     });
 
     return () => {
+      baseMarker.current?.remove();
+      overlayMarker.current?.remove();
       map.current?.remove();
     };
   }, []);
@@ -83,16 +87,10 @@ export const MapComponent = ({
   // Load base location boundary
   useEffect(() => {
     if (!mapLoaded || !map.current || !baseLocation || !baseLocationName) {
-      console.log("Base boundary loading skipped - requirements not met:", {
-        mapLoaded,
-        hasMap: !!map.current,
-        baseLocation,
-        baseLocationName
-      });
       return;
     }
     
-    console.log("Loading base boundary for:", baseLocationName);
+    console.log(`Loading base boundary for: ${baseLocationName} (refresh key: ${refreshKey})`);
     setIsLoadingBoundaries(true);
     
     const boundaryId = (window as any).baseBoundaryId;
@@ -101,13 +99,7 @@ export const MapComponent = ({
         console.log("Base boundary loaded:", bounds);
         setBaseBounds(bounds);
         
-        // Fit map to base boundary
-        map.current?.fitBounds(bounds.bbox, {
-          padding: { top: 50, bottom: 50, left: 50, right: 50 },
-          duration: 2000
-        });
-        
-        // Remove existing base boundary layers if they exist
+        // Remove existing layers
         if (map.current?.getSource("base-boundary")) {
           if (map.current.getLayer("base-boundary-fill")) {
             map.current.removeLayer("base-boundary-fill");
@@ -118,7 +110,7 @@ export const MapComponent = ({
           map.current.removeSource("base-boundary");
         }
         
-        // Add base boundary to map
+        // Add boundary to map
         map.current?.addSource("base-boundary", {
           type: "geojson",
           data: bounds.boundary
@@ -145,17 +137,24 @@ export const MapComponent = ({
           }
         });
 
-        // Add center marker
-        new mapboxgl.Marker({ color: "#3b82f6" })
+        // Update marker
+        baseMarker.current?.remove();
+        baseMarker.current = new mapboxgl.Marker({ color: "#3b82f6" })
           .setLngLat(baseLocation)
           .setPopup(
             new mapboxgl.Popup({ offset: 25 }).setHTML(
               `<div class="font-medium">${baseLocationName}</div>
                <div class="text-sm text-gray-600">Base Location</div>
-               <div class="text-xs text-gray-500">Area: ${bounds.boundary.properties.area?.toFixed(0)} km²</div>`
+               <div class="text-xs text-gray-500">Area: ${bounds.boundary.properties.area?.toFixed(0) || 'N/A'} km²</div>`
             )
           )
           .addTo(map.current!);
+
+        // Fit map to boundary
+        map.current?.fitBounds(bounds.bbox, {
+          padding: { top: 50, bottom: 50, left: 50, right: 50 },
+          duration: 2000
+        });
       })
       .catch((error) => {
         console.error("Error loading base boundary:", error);
@@ -164,22 +163,15 @@ export const MapComponent = ({
       .finally(() => {
         setIsLoadingBoundaries(false);
       });
-  }, [baseLocation, baseLocationName, mapLoaded]);
+  }, [baseLocation, baseLocationName, mapLoaded, refreshKey]);
 
-  // Load overlay location boundary and create overlay
+  // Load overlay location boundary
   useEffect(() => {
     if (!mapLoaded || !map.current || !overlayLocation || !overlayLocationName || !baseBounds) {
-      console.log("Overlay loading skipped - requirements not met:", {
-        mapLoaded,
-        hasMap: !!map.current,
-        overlayLocation,
-        overlayLocationName,
-        baseBounds: !!baseBounds
-      });
       return;
     }
     
-    console.log("Loading overlay boundary for:", overlayLocationName);
+    console.log(`Loading overlay boundary for: ${overlayLocationName} (refresh key: ${refreshKey})`);
     setIsLoadingBoundaries(true);
     
     const boundaryId = (window as any).overlayBoundaryId;
@@ -188,19 +180,16 @@ export const MapComponent = ({
         console.log("Overlay boundary loaded:", bounds);
         setOverlayBounds(bounds);
         
-        // Calculate scale ratio (how much to scale overlay to match base)
         const scaleRatio = calculateScaleRatio(baseBounds, bounds);
         console.log("Scale ratio calculated:", scaleRatio);
         
-        // Transform overlay geometry to fit over base location
         const transformedOverlay = transformOverlayGeometry(
           bounds, 
           baseBounds.center, 
           scaleRatio
         );
-        console.log("Transformed overlay:", transformedOverlay);
         
-        // Remove existing overlay layers if they exist
+        // Remove existing overlay layers
         if (map.current?.getSource("overlay-boundary")) {
           if (map.current.getLayer("overlay-boundary-fill")) {
             map.current.removeLayer("overlay-boundary-fill");
@@ -211,7 +200,7 @@ export const MapComponent = ({
           map.current.removeSource("overlay-boundary");
         }
         
-        // Add transformed overlay to map
+        // Add transformed overlay
         map.current?.addSource("overlay-boundary", {
           type: "geojson",
           data: transformedOverlay
@@ -239,14 +228,15 @@ export const MapComponent = ({
           }
         });
 
-        // Add overlay center marker
-        new mapboxgl.Marker({ color: "#10b981" })
+        // Update overlay marker
+        overlayMarker.current?.remove();
+        overlayMarker.current = new mapboxgl.Marker({ color: "#10b981" })
           .setLngLat(baseBounds.center)
           .setPopup(
             new mapboxgl.Popup({ offset: 25 }).setHTML(
               `<div class="font-medium">${overlayLocationName}</div>
                <div class="text-sm text-gray-600">Overlay Location</div>
-               <div class="text-xs text-gray-500">Area: ${bounds.boundary.properties.area?.toFixed(0)} km²</div>
+               <div class="text-xs text-gray-500">Area: ${bounds.boundary.properties.area?.toFixed(0) || 'N/A'} km²</div>
                <div class="text-xs text-gray-500">Scale: ${scaleRatio.toFixed(2)}x</div>`
             )
           )
@@ -265,18 +255,25 @@ export const MapComponent = ({
       .finally(() => {
         setIsLoadingBoundaries(false);
       });
-  }, [overlayLocation, overlayLocationName, baseBounds, mapLoaded]);
+  }, [overlayLocation, overlayLocationName, baseBounds, mapLoaded, refreshKey]);
 
   return (
     <div className="relative w-full h-full">
       <div ref={mapContainer} className="absolute inset-0 rounded-lg overflow-hidden shadow-lg" />
       
-      {/* Loading indicator for boundaries */}
       {isLoadingBoundaries && (
         <div className="absolute top-4 left-4 bg-card/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg border">
           <div className="flex items-center gap-2 text-sm">
             <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
             Loading boundaries...
+          </div>
+        </div>
+      )}
+
+      {refreshKey > 0 && (
+        <div className="absolute top-4 right-4 bg-blue-50/90 backdrop-blur-sm rounded-lg px-3 py-1 shadow-lg border border-blue-200">
+          <div className="text-xs text-blue-700">
+            Data refreshed
           </div>
         </div>
       )}
