@@ -39,7 +39,7 @@ export const LocationStep = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
-  const [pendingLocation, setPendingLocation] = useState<{name: string, coordinates: [number, number], searchResult?: any} | null>(null);
+  const [pendingLocation, setPendingLocation] = useState<{name: string, coordinates: [number, number], searchResult?: any, triedSuggestion?: boolean} | null>(null);
   const { toast } = useToast();
 
   const colorClasses = {
@@ -182,18 +182,56 @@ export const LocationStep = ({
       } else {
         // Check if there are suggestions in the failed result
         const failedResult = results[0];
-        if (failedResult?.suggestions && failedResult.suggestions.length > 0) {
+        if (failedResult?.suggestions && failedResult.suggestions.length > 0 && !pendingLocation.triedSuggestion) {
+          const suggestion = failedResult.suggestions[0];
           toast({
             title: "Location not found",
-            description: `Trying alternative: ${failedResult.suggestions[0]}`,
+            description: `Trying alternative: ${suggestion}`,
           });
           
-          // Try the first suggestion
-          handleDownload();
-          return;
+          // Update pending location with suggestion and mark as tried
+          setPendingLocation(prev => ({
+            ...prev!,
+            name: suggestion,
+            triedSuggestion: true
+          }));
+          
+          // Try the suggestion but avoid infinite loop
+          const suggestionCityData = {
+            name: suggestion,
+            country: "US",
+            adminLevel: 8
+          };
+          
+          const { data: suggestionData, error: suggestionError } = await supabase.functions.invoke('fetch-osm-boundaries', {
+            body: { cities: [suggestionCityData] }
+          });
+          
+          if (!suggestionError && suggestionData?.results?.find((r: any) => r.success)) {
+            // If suggestion worked, proceed normally
+            const successResult = suggestionData.results.find((r: any) => r.success);
+            const { data: newData } = await supabase
+              .from('city_boundaries')
+              .select('id, name, center_lat, center_lng')
+              .eq('normalized_name', suggestion.toLowerCase().replace(/[^a-z0-9]/g, ''))
+              .single();
+              
+            if (newData) {
+              onLocationSelect(newData.name, [newData.center_lng, newData.center_lat], parseInt(newData.id));
+              toast({
+                title: "Download complete",
+                description: `${newData.name} boundary data has been downloaded`,
+              });
+            } else {
+              onLocationSelect(suggestion, pendingLocation.coordinates);
+            }
+          } else {
+            // Suggestion also failed, use point location
+            throw new Error('Alternative location also not found');
+          }
+        } else {
+          throw new Error(failedResult?.error || 'Failed to download boundary data');
         }
-        
-        throw new Error(failedResult?.error || 'Failed to download boundary data');
       }
     } catch (error) {
       console.error('Download error:', error);

@@ -74,6 +74,31 @@ export async function getBoundaryData(id: number | null, name: string | null): P
       return null;
     }
 
+    // Validate geometry before returning
+    if (data && data.boundary) {
+      const geometry = data.boundary.geometry;
+      if (!geometry || !geometry.coordinates || geometry.coordinates.length === 0) {
+        console.error('Invalid geometry data received:', geometry);
+        toast.error('Invalid boundary geometry data');
+        return null;
+      }
+      
+      // Additional validation for polygon/multipolygon
+      if (geometry.type === 'Polygon') {
+        if (!Array.isArray(geometry.coordinates[0]) || geometry.coordinates[0].length < 4) {
+          console.error('Invalid polygon coordinates');
+          toast.error('Invalid polygon boundary data');
+          return null;
+        }
+      } else if (geometry.type === 'MultiPolygon') {
+        if (!Array.isArray(geometry.coordinates) || geometry.coordinates.length === 0) {
+          console.error('Invalid multipolygon coordinates');
+          toast.error('Invalid multipolygon boundary data');
+          return null;
+        }
+      }
+    }
+
     console.log("Boundary data:", data);
     return data;
   } catch (error) {

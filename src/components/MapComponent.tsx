@@ -37,10 +37,15 @@ export const MapComponent = ({
       mapboxgl.accessToken = MAPBOX_TOKEN;
 
       try {
+        // Validate baseLocation coordinates
+        const validCenter: [number, number] = (baseLocation && !isNaN(baseLocation[0]) && !isNaN(baseLocation[1])) 
+          ? baseLocation 
+          : [-74.5, 40]; // Default to NYC area if invalid
+          
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
           style: "mapbox://styles/mapbox/light-v11",
-          center: baseLocation || [-74.5, 40],
+          center: validCenter,
           zoom: 9,
           attributionControl: false,
         });
@@ -132,10 +137,15 @@ export const MapComponent = ({
         }
         
         // Add boundary to map
-        map.current?.addSource("base-boundary", {
-          type: "geojson",
-          data: bounds.boundary
-        });
+        if (bounds && bounds.boundary && bounds.boundary.geometry) {
+          map.current?.addSource("base-boundary", {
+            type: "geojson",
+            data: bounds.boundary
+          });
+        } else {
+          console.error("Invalid boundary data for map:", bounds);
+          throw new Error("Invalid boundary geometry");
+        }
         
         map.current?.addLayer({
           id: "base-boundary-fill",
