@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { searchBoundaries, BoundarySearchResult } from "@/lib/supabaseBoundaryService";
 
 interface LocationSearchProps {
-  onLocationSelect: (location: string, coordinates: [number, number], boundaryId?: number) => void;
+  onLocationSelect: (location: string, coordinates: [number, number], boundaryId?: number, fullLocation?: any) => void;
   placeholder?: string;
   className?: string;
 }
@@ -59,7 +59,8 @@ export const LocationSearch = ({ onLocationSelect, placeholder = "Search for a l
     }
     
     // Use the simple name instead of full place_name for boundary data lookup
-    onLocationSelect(location.name, center, location.id);
+    // Pass the full location object so OSM data can be used for downloads
+    onLocationSelect(location.name, center, location.id, location);
     setQuery(location.name);
     setSuggestions([]);
   };

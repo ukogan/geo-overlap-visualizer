@@ -22,7 +22,7 @@ interface LocationStepProps {
   color: "blue" | "green";
   placeholder: string;
   selectedLocation?: string;
-  onLocationSelect: (location: string, coordinates: [number, number], boundaryId?: number) => void;
+  onLocationSelect: (location: string, coordinates: [number, number], boundaryId?: number, fullLocation?: any) => void;
   isActive?: boolean;
 }
 
@@ -107,13 +107,15 @@ export const LocationStep = ({
     }
   };
 
-  const handleLocationSearch = async (location: string, coordinates: [number, number]) => {
+  const handleLocationSearch = async (location: string, coordinates: [number, number], boundaryId?: number, fullLocation?: any) => {
+    console.log('Selected location:', location, 'Full location data:', fullLocation);
+    
     const existingData = await checkExistingData(location);
 
     if (existingData.existing && existingData.existing.length > 0) {
       // Use the first existing match
       const match = existingData.existing[0];
-      onLocationSelect(match.name, match.coordinates, parseInt(match.id));
+      onLocationSelect(match.name, match.coordinates, parseInt(match.id), fullLocation);
       toast({
         title: "Using existing data",
         description: `${match.name} is already available in the database`,
@@ -121,8 +123,8 @@ export const LocationStep = ({
       return;
     }
 
-    // If we have search results, store the first one for download
-    const searchResult = existingData.searchResults?.[0];
+    // Use the fullLocation data from search if available, otherwise use search results
+    const searchResult = fullLocation || existingData.searchResults?.[0];
     
     // No existing data, prompt for download
     setPendingLocation({ 
