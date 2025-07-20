@@ -56,13 +56,16 @@ serve(async (req) => {
         const currentPointCount = existingBoundary?.geometry_geojson ? 
           JSON.stringify(existingBoundary.geometry_geojson).length : 0;
 
-        // Build Overpass query for the city
+        // Build Overpass query for the city - fix the query to include way geometry
         let overpassQuery = '';
         
         if (city.relationId) {
           overpassQuery = `
             [out:json][timeout:120];
-            rel(${city.relationId});
+            (
+              rel(${city.relationId});
+              >;
+            );
             out geom;
           `;
         } else {
@@ -74,6 +77,7 @@ serve(async (req) => {
                 rel["name"~"New York Metropolitan",i]["type"="boundary"];
                 rel["name"~"Greater New York",i]["type"="boundary"];
                 rel(175905);
+                >;
               );
               out geom;
             `;
@@ -85,6 +89,7 @@ serve(async (req) => {
                 rel["name"~"Chicago Metropolitan",i]["type"="boundary"];
                 rel["name"~"Greater Chicago",i]["type"="boundary"];
                 rel(122604);
+                >;
               );
               out geom;
             `;
@@ -99,6 +104,7 @@ serve(async (req) => {
                 rel["name"~"${city.name} Metropolitan",i]["type"="boundary"];
                 rel["name"~"${city.name} Metro",i]["type"="boundary"];
                 rel["name"~"Greater ${city.name}",i]["type"="boundary"];
+                >;
               );
               out geom;
             `;
