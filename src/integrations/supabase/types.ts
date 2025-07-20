@@ -1891,6 +1891,19 @@ export type Database = {
         }
         Returns: string
       }
+      upsert_boundary: {
+        Args: {
+          boundary_name: string
+          geojson_data: Json
+          bbox_data: Json
+          center_lng: number
+          center_lat: number
+          area_km2: number
+          admin_level?: number
+          country_code?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
