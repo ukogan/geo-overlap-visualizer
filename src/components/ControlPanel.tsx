@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { LocationSearch } from "./LocationSearch";
-import { RefreshCcw, Map, Layers } from "lucide-react";
+import { RefreshCcw, Map, Layers, Download } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface ControlPanelProps {
   onBaseLocationSelect: (location: string, coordinates: [number, number]) => void;
@@ -22,6 +24,8 @@ export const ControlPanel = ({
   onReset,
 }: ControlPanelProps) => {
   const [step, setStep] = useState<"base" | "overlay">("base");
+  const [isLoadingOSM, setIsLoadingOSM] = useState(false);
+  const { toast } = useToast();
 
   const handleBaseLocationSelect = (location: string, coordinates: [number, number]) => {
     onBaseLocationSelect(location, coordinates);
@@ -37,6 +41,54 @@ export const ControlPanel = ({
     setStep("base");
   };
 
+  const fetchOSMBoundaries = async () => {
+    if (isLoadingOSM) return;
+    
+    setIsLoadingOSM(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-osm-boundaries', {
+        body: {
+          cities: [
+            {
+              name: "New York",
+              country: "US",
+              adminLevel: 4 // Metropolitan area level
+            },
+            {
+              name: "Chicago", 
+              country: "US",
+              adminLevel: 4
+            }
+          ]
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      console.log('OSM fetch results:', data);
+      
+      const successCount = data.results?.filter((r: any) => r.success).length || 0;
+      const totalCount = data.results?.length || 0;
+      
+      toast({
+        title: "OSM Data Updated",
+        description: `Successfully fetched detailed boundary data for ${successCount}/${totalCount} cities`,
+      });
+
+    } catch (error) {
+      console.error('Error fetching OSM boundaries:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch OSM boundary data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingOSM(false);
+    }
+  };
+
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="pb-4">
@@ -50,6 +102,31 @@ export const ControlPanel = ({
       </CardHeader>
       
       <CardContent className="space-y-6">
+        {/* OSM Data Update Button */}
+        <div className="space-y-3">
+          <Separator />
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Download className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Update Boundary Data</span>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={fetchOSMBoundaries}
+              disabled={isLoadingOSM}
+              className="w-full text-xs h-8"
+            >
+              {isLoadingOSM ? "Fetching..." : "Fetch Detailed OSM Data (NY & Chicago)"}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Updates New York and Chicago with detailed OpenStreetMap boundary data
+            </p>
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Step 1: Base Location */}
         <div className="space-y-3">
           <div className="flex items-center gap-2">
@@ -132,6 +209,19 @@ export const ControlPanel = ({
                 }}
               >
                 Switzerland vs Rhode Island
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="justify-start text-xs h-8"
+                onClick={() => {
+                  handleBaseLocationSelect("New York", [74.0059, 40.7128]);
+                  setTimeout(() => {
+                    handleOverlayLocationSelect("Chicago", [-87.6298, 41.8781]);
+                  }, 1000);
+                }}
+              >
+                New York vs Chicago
               </Button>
             </div>
           </div>
