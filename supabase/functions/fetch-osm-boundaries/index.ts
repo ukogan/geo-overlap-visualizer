@@ -69,7 +69,7 @@ serve(async (req) => {
             out geom;
           `;
         } else {
-          if (city.name === "New York" || city.name === "New York Metropolitan Area") {
+          if (city.name === "New York" || city.name === "New York Metropolitan Area" || city.name === "New York City") {
             overpassQuery = `
               [out:json][timeout:120];
               (
@@ -84,10 +84,89 @@ serve(async (req) => {
             overpassQuery = `
               [out:json][timeout:120];
               (
-                rel["name"~"Chicago",i]["type"="boundary"]["boundary"="administrative"]["admin_level"~"[4-6]"];
-                rel["name"~"Chicago Metropolitan",i]["type"="boundary"];
-                rel["name"~"Greater Chicago",i]["type"="boundary"];
+                rel["name"~"Chicago",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="Chicago"]["type"="boundary"];
                 rel(122604);
+                >;
+              );
+              out geom;
+            `;
+          } else if (city.name === "Los Angeles") {
+            overpassQuery = `
+              [out:json][timeout:120];
+              (
+                rel["name"~"Los Angeles",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="City of Los Angeles"]["type"="boundary"];
+                >;
+              );
+              out geom;
+            `;
+          } else if (city.name === "Houston") {
+            overpassQuery = `
+              [out:json][timeout:120];
+              (
+                rel["name"~"Houston",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="City of Houston"]["type"="boundary"];
+                >;
+              );
+              out geom;
+            `;
+          } else if (city.name === "Phoenix") {
+            overpassQuery = `
+              [out:json][timeout:120];
+              (
+                rel["name"~"Phoenix",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="City of Phoenix"]["type"="boundary"];
+                >;
+              );
+              out geom;
+            `;
+          } else if (city.name === "Philadelphia") {
+            overpassQuery = `
+              [out:json][timeout:120];
+              (
+                rel["name"~"Philadelphia",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="City of Philadelphia"]["type"="boundary"];
+                >;
+              );
+              out geom;
+            `;
+          } else if (city.name === "San Antonio") {
+            overpassQuery = `
+              [out:json][timeout:120];
+              (
+                rel["name"~"San Antonio",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="City of San Antonio"]["type"="boundary"];
+                >;
+              );
+              out geom;
+            `;
+          } else if (city.name === "San Diego") {
+            overpassQuery = `
+              [out:json][timeout:120];
+              (
+                rel["name"~"San Diego",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="City of San Diego"]["type"="boundary"];
+                >;
+              );
+              out geom;
+            `;
+          } else if (city.name === "Dallas") {
+            overpassQuery = `
+              [out:json][timeout:120];
+              (
+                rel["name"~"Dallas",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="City of Dallas"]["type"="boundary"];
+                >;
+              );
+              out geom;
+            `;
+          } else if (city.name === "Austin") {
+            overpassQuery = `
+              [out:json][timeout:120];
+              (
+                rel["name"~"Austin",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="City of Austin"]["type"="boundary"];
                 >;
               );
               out geom;
