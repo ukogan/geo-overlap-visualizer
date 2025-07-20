@@ -78,9 +78,30 @@ export const MapComponent = ({
     });
 
     return () => {
-      baseMarker.current?.remove();
-      overlayMarker.current?.remove();
-      map.current?.remove();
+      try {
+        // Clean up markers first
+        if (baseMarker.current) {
+          baseMarker.current.remove();
+          baseMarker.current = null;
+        }
+        if (overlayMarker.current) {
+          overlayMarker.current.remove();
+          overlayMarker.current = null;
+        }
+        
+        // Clean up map only if it's properly initialized
+        if (map.current && map.current.getContainer()) {
+          // Remove map
+          map.current.remove();
+          map.current = null;
+        }
+      } catch (error) {
+        console.warn("Error during map cleanup:", error);
+        // Force cleanup if needed
+        if (map.current) {
+          map.current = null;
+        }
+      }
     };
   }, []);
 
