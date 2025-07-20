@@ -47,14 +47,24 @@ async function checkExistingCityData(supabase: any, cityName: string) {
     return { existing: exactMatch, suggestions: [] };
   }
   
-  // Check for similar matches
+  // Check for similar matches - be more restrictive to avoid false matches
   const suggestions = existingCities?.filter(city => {
     const cityNormalized = normalizeCityName(city.name);
     const searchNormalized = normalizedName;
     
-    // Check if either name contains the other (for variations like "New York" vs "New York City")
-    return cityNormalized.includes(searchNormalized.split(' ')[0]) || 
-           searchNormalized.includes(cityNormalized.split(' ')[0]);
+    // Only suggest if the names have significant overlap (at least 60% similarity)
+    const searchWords = searchNormalized.split(' ');
+    const cityWords = cityNormalized.split(' ');
+    
+    // For single word searches like "San", require at least 2 matching words
+    if (searchWords.length === 1 && searchWords[0].length <= 3) {
+      return false; // Don't suggest for very short single words
+    }
+    
+    // Check if names are similar enough to suggest
+    return cityNormalized.includes(searchNormalized) || 
+           searchNormalized.includes(cityNormalized) ||
+           (searchWords.length > 1 && cityWords.some(word => searchWords.includes(word) && word.length > 3));
   }) || [];
   
   return { existing: null, suggestions };
