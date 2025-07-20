@@ -22,6 +22,9 @@ export interface OSMFetchResult {
   rings?: number;
   areaKm2?: number;
   relationId?: string;
+  message?: string;
+  suggestions?: string[];
+  existing?: boolean;
 }
 
 export function useBoundaryData() {

@@ -37,12 +37,18 @@ export const OSMFetchStatus = ({ results }: OSMFetchStatusProps) => {
             
             {result.success ? (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>Points:</span>
-                  <span className="text-muted-foreground">{result.beforePoints?.toLocaleString() || 0}</span>
-                  <ArrowRight className="h-3 w-3" />
-                  <span className="font-medium text-green-600">{result.afterPoints?.toLocaleString() || 0}</span>
-                </div>
+                {result.existing ? (
+                  <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                    ✓ Using existing cached data
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Points:</span>
+                    <span className="text-muted-foreground">{result.beforePoints?.toLocaleString() || 0}</span>
+                    <ArrowRight className="h-3 w-3" />
+                    <span className="font-medium text-green-600">{result.afterPoints?.toLocaleString() || 0}</span>
+                  </div>
+                )}
                 {result.rings && (
                   <div className="text-xs text-muted-foreground">
                     <span>Rings: {result.rings}</span>
@@ -55,8 +61,21 @@ export const OSMFetchStatus = ({ results }: OSMFetchStatusProps) => {
                 )}
               </div>
             ) : (
-              <div className="text-xs text-red-600">
-                {result.error || 'Unknown error'}
+              <div className="space-y-2">
+                <div className="text-xs text-red-600">
+                  {result.error || result.message || 'Unknown error'}
+                </div>
+                {result.suggestions && result.suggestions.length > 0 && (
+                  <div className="text-xs bg-yellow-50 p-2 rounded border border-yellow-200">
+                    <div className="font-medium text-yellow-800 mb-1">Similar cities available:</div>
+                    <div className="text-yellow-700">
+                      {result.suggestions.join(', ')}
+                    </div>
+                    <div className="text-yellow-600 mt-1 italic">
+                      Consider using existing data or fetch the specific city you need.
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

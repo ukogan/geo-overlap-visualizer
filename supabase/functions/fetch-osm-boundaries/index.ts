@@ -14,6 +14,82 @@ interface CityQuery {
   relationId?: string;
 }
 
+// Helper function to normalize city names for comparison
+function normalizeCityName(name: string): string {
+  return name.toLowerCase()
+    .replace(/\s+(city|metropolitan|metro|area|county|greater)\s*/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Helper function to check for existing city data
+async function checkExistingCityData(supabase: any, cityName: string) {
+  const normalizedName = normalizeCityName(cityName);
+  
+  const { data: existingCities, error } = await supabase
+    .from('city_boundaries')
+    .select('name, normalized_name, boundary_data, area_km2, population, osm_relation_id')
+    .ilike('normalized_name', `%${normalizedName.split(' ')[0]}%`);
+    
+  if (error) {
+    console.error('Error checking existing cities:', error);
+    return { existing: null, suggestions: [] };
+  }
+  
+  // Check for exact match first
+  const exactMatch = existingCities?.find(city => 
+    normalizeCityName(city.name) === normalizedName
+  );
+  
+  if (exactMatch) {
+    return { existing: exactMatch, suggestions: [] };
+  }
+  
+  // Check for similar matches
+  const suggestions = existingCities?.filter(city => {
+    const cityNormalized = normalizeCityName(city.name);
+    const searchNormalized = normalizedName;
+    
+    // Check if either name contains the other (for variations like "New York" vs "New York City")
+    return cityNormalized.includes(searchNormalized.split(' ')[0]) || 
+           searchNormalized.includes(cityNormalized.split(' ')[0]);
+  }) || [];
+  
+  return { existing: null, suggestions };
+}
+
+// Helper function to save city data to database
+async function saveCityData(supabase: any, cityName: string, boundaryData: any, osmRelationId?: number) {
+  try {
+    const area = boundaryData.boundary?.properties?.area || null;
+    const population = boundaryData.boundary?.properties?.population || null;
+    const bbox = boundaryData.bbox || null;
+    const center = boundaryData.center || [null, null];
+    
+    const { error } = await supabase
+      .from('city_boundaries')
+      .insert({
+        name: cityName,
+        osm_relation_id: osmRelationId,
+        boundary_data: boundaryData,
+        area_km2: area,
+        population: population,
+        bbox: bbox,
+        center_lat: center[1],
+        center_lng: center[0],
+        admin_level: boundaryData.boundary?.properties?.admin_level || null
+      });
+      
+    if (error) {
+      console.error('Error saving city data:', error);
+    } else {
+      console.log(`Successfully saved data for ${cityName}`);
+    }
+  } catch (error) {
+    console.error('Error in saveCityData:', error);
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -46,7 +122,40 @@ serve(async (req) => {
       try {
         console.log(`Processing: ${city.name}`);
         
-        // Get current boundary data for comparison
+        // Check if we already have this city data in city_boundaries table
+        const { existing, suggestions } = await checkExistingCityData(supabase, city.name);
+        
+        if (existing) {
+          console.log(`Found existing data for ${city.name}`);
+          results.push({
+            name: city.name,
+            success: true,
+            message: `Using existing data for ${city.name}`,
+            relationId: existing.osm_relation_id,
+            areaKm2: existing.area_km2,
+            population: existing.population,
+            coordinateCount: JSON.stringify(existing.boundary_data).length,
+            beforePoints: 0,
+            afterPoints: JSON.stringify(existing.boundary_data).length,
+            existing: true
+          });
+          continue;
+        }
+        
+        if (suggestions.length > 0) {
+          console.log(`Found similar cities for ${city.name}:`, suggestions.map(s => s.name));
+          results.push({
+            name: city.name,
+            success: false,
+            message: `Similar city data available: ${suggestions.map(s => s.name).join(', ')}. Use existing data or proceed with specific fetch?`,
+            suggestions: suggestions.map(s => s.name),
+            beforePoints: 0,
+            afterPoints: 0
+          });
+          continue;
+        }
+        
+        // Get current boundary data for comparison (from old boundaries table)
         const { data: existingBoundary } = await supabase
           .from('boundaries')
           .select('name, geometry_geojson')
@@ -548,6 +657,25 @@ serve(async (req) => {
           });
           continue;
         }
+
+        // Save city data to city_boundaries table
+        const boundaryData = {
+          boundary: {
+            type: "Feature",
+            geometry: geoJson,
+            properties: {
+              name: city.name,
+              area: areaKm2,
+              admin_level: city.adminLevel || null,
+              country_code: city.country || 'US',
+              center: [centerLng, centerLat]
+            }
+          },
+          center: [centerLng, centerLat],
+          bbox: [minLng, minLat, maxLng, maxLat]
+        };
+
+        await saveCityData(supabase, city.name, boundaryData, bestRelation.id);
 
         results.push({
           name: city.name,

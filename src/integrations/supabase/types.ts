@@ -68,6 +68,57 @@ export type Database = {
         }
         Relationships: []
       }
+      city_boundaries: {
+        Row: {
+          admin_level: number | null
+          area_km2: number | null
+          bbox: Json | null
+          boundary_data: Json
+          center_lat: number | null
+          center_lng: number | null
+          country_code: string | null
+          created_at: string
+          id: string
+          name: string
+          normalized_name: string
+          osm_relation_id: number | null
+          population: number | null
+          updated_at: string
+        }
+        Insert: {
+          admin_level?: number | null
+          area_km2?: number | null
+          bbox?: Json | null
+          boundary_data: Json
+          center_lat?: number | null
+          center_lng?: number | null
+          country_code?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          normalized_name: string
+          osm_relation_id?: number | null
+          population?: number | null
+          updated_at?: string
+        }
+        Update: {
+          admin_level?: number | null
+          area_km2?: number | null
+          bbox?: Json | null
+          boundary_data?: Json
+          center_lat?: number | null
+          center_lng?: number | null
+          country_code?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          normalized_name?: string
+          osm_relation_id?: number | null
+          population?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       spatial_ref_sys: {
         Row: {
           auth_name: string | null
@@ -613,6 +664,10 @@ export type Database = {
       longtransactionsenabled: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      normalize_city_name: {
+        Args: { city_name: string }
+        Returns: string
       }
       path: {
         Args: { "": unknown }
