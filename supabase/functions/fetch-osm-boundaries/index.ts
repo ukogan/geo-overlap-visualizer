@@ -144,15 +144,19 @@ serve(async (req) => {
         
         if (bestRelation.members) {
           for (const member of bestRelation.members) {
-            if (member.type === 'way' && member.role === 'outer') {
+            if (member.type === 'way' && (member.role === 'outer' || member.role === '' || !member.role)) {
               const way = overpassData.elements.find((el: any) => el.type === 'way' && el.id === member.ref);
-              if (way && way.geometry) {
+              if (way && way.geometry && way.geometry.length > 0) {
                 const wayCoords = way.geometry.map((node: any) => [node.lon, node.lat]);
-                coordinates.push(wayCoords);
+                if (wayCoords.length > 2) { // Only include ways with at least 3 points
+                  coordinates.push(wayCoords);
+                }
               }
             }
           }
         }
+
+        console.log(`Extracted ${coordinates.length} coordinate rings for ${city.name}`);
 
         if (coordinates.length === 0) {
           console.log(`No valid coordinates found for ${city.name}`);
