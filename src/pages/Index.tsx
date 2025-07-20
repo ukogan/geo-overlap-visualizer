@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MapComponent } from "@/components/MapComponent";
 import { ControlPanel } from "@/components/ControlPanel";
+import { OSMFetchResult } from "@/hooks/useBoundaryData";
 import { Globe, ArrowRight } from "lucide-react";
 
 const Index = () => {
@@ -9,6 +10,7 @@ const Index = () => {
   const [baseLocationName, setBaseLocationName] = useState<string>("");
   const [overlayLocationName, setOverlayLocationName] = useState<string>("");
   const [mapRefreshKey, setMapRefreshKey] = useState(0);
+  const [osmResults, setOsmResults] = useState<OSMFetchResult[]>([]);
 
   const handleBaseLocationSelect = (location: string, coordinates: [number, number], boundaryId?: number) => {
     setBaseLocation(coordinates);
@@ -33,6 +35,10 @@ const Index = () => {
 
   const handleBoundaryDataRefresh = () => {
     setMapRefreshKey(prev => prev + 1);
+  };
+
+  const handleOsmResults = (results: OSMFetchResult[]) => {
+    setOsmResults(results);
   };
 
   return (
@@ -64,6 +70,7 @@ const Index = () => {
               overlayLocationName={overlayLocationName}
               onReset={handleReset}
               onBoundaryDataRefresh={handleBoundaryDataRefresh}
+              onOsmResults={handleOsmResults}
             />
             
             {/* Comparison Info */}

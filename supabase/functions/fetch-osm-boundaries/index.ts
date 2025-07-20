@@ -217,7 +217,8 @@ serve(async (req) => {
           name: city.name,
           success: true,
           coordinateCount: allCoords.length,
-          relationId: bestRelation.id
+          relationId: bestRelation.id,
+          areaKm2: areaKm2
         });
 
         console.log(`Successfully processed ${city.name} with ${allCoords.length} coordinate points`);
@@ -227,7 +228,7 @@ serve(async (req) => {
         results.push({
           name: city.name,
           success: false,
-          error: error.message
+          error: error.message || 'Unknown error'
         });
       }
     }

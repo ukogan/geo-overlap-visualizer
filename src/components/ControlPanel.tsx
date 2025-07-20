@@ -4,17 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { LocationSearch } from "./LocationSearch";
+import { OSMFetchStatus } from "./OSMFetchStatus";
 import { RefreshCcw, Map, Layers, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { OSMFetchResult } from "@/hooks/useBoundaryData";
 
 interface ControlPanelProps {
-  onBaseLocationSelect: (location: string, coordinates: [number, number]) => void;
-  onOverlayLocationSelect: (location: string, coordinates: [number, number]) => void;
+  onBaseLocationSelect: (location: string, coordinates: [number, number], boundaryId?: number) => void;
+  onOverlayLocationSelect: (location: string, coordinates: [number, number], boundaryId?: number) => void;
   baseLocationName?: string;
   overlayLocationName?: string;
   onReset: () => void;
   onBoundaryDataRefresh: () => void;
+  onOsmResults: (results: OSMFetchResult[]) => void;
 }
 
 export const ControlPanel = ({
@@ -24,19 +27,20 @@ export const ControlPanel = ({
   overlayLocationName,
   onReset,
   onBoundaryDataRefresh,
+  onOsmResults,
 }: ControlPanelProps) => {
   const [step, setStep] = useState<"base" | "overlay">("base");
   const [isLoadingOSM, setIsLoadingOSM] = useState(false);
   const [fetchResults, setFetchResults] = useState<any[]>([]);
   const { toast } = useToast();
 
-  const handleBaseLocationSelect = (location: string, coordinates: [number, number]) => {
-    onBaseLocationSelect(location, coordinates);
+  const handleBaseLocationSelect = (location: string, coordinates: [number, number], boundaryId?: number) => {
+    onBaseLocationSelect(location, coordinates, boundaryId);
     setStep("overlay");
   };
 
-  const handleOverlayLocationSelect = (location: string, coordinates: [number, number]) => {
-    onOverlayLocationSelect(location, coordinates);
+  const handleOverlayLocationSelect = (location: string, coordinates: [number, number], boundaryId?: number) => {
+    onOverlayLocationSelect(location, coordinates, boundaryId);
   };
 
   const handleReset = () => {
@@ -57,7 +61,7 @@ export const ControlPanel = ({
             {
               name: "New York",
               country: "US",
-              adminLevel: 4 // Metropolitan area level
+              adminLevel: 4
             },
             {
               name: "Chicago", 
@@ -69,15 +73,17 @@ export const ControlPanel = ({
       });
 
       if (error) {
-        throw error;
+        console.error('OSM fetch error:', error);
+        throw new Error(error.message || 'Failed to fetch OSM data');
       }
 
-      console.log('OSM fetch results:', data);
+      console.log('OSM fetch response:', data);
       
-      const results = data.results || [];
+      const results = data?.results || [];
       setFetchResults(results);
+      onOsmResults(results);
       
-      const successCount = results.filter((r: any) => r.success).length;
+      const successCount = results.filter((r: OSMFetchResult) => r.success).length;
       const totalCount = results.length;
       
       toast({
@@ -92,12 +98,18 @@ export const ControlPanel = ({
 
     } catch (error) {
       console.error('Error fetching OSM boundaries:', error);
+      const errorResults: OSMFetchResult[] = [
+        { name: "New York", success: false, error: error.message },
+        { name: "Chicago", success: false, error: error.message }
+      ];
+      setFetchResults(errorResults);
+      onOsmResults(errorResults);
+      
       toast({
         title: "Error",
         description: "Failed to fetch OSM boundary data",
         variant: "destructive",
       });
-      setFetchResults([]);
     } finally {
       setIsLoadingOSM(false);
     }
@@ -139,33 +151,7 @@ export const ControlPanel = ({
           </div>
         </div>
 
-        {/* Fetch Results Display */}
-        {fetchResults.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
-                Results
-              </Badge>
-              <span className="text-sm font-medium">Data Fetched</span>
-            </div>
-            <div className="space-y-2">
-              {fetchResults.map((result, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs">
-                  <span className="font-medium">{result.name}</span>
-                  {result.success ? (
-                    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                      {result.coordinateCount?.toLocaleString() || 0} points
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
-                      Failed
-                    </Badge>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <OSMFetchStatus results={fetchResults} />
 
         <Separator />
 
