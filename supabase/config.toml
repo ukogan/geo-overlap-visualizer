@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.get-boundary]
 verify_jwt = false
+
+[functions.fetch-osm-boundaries]
+verify_jwt = false
