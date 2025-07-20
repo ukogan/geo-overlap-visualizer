@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -79,6 +80,40 @@ export async function getBoundaryData(id: number | null, name: string | null): P
     console.error("Error getting boundary data:", error);
     toast.error(`Failed to load boundary data`);
     return null;
+  }
+}
+
+// Updated function to fetch OSM boundaries with OSM data
+export async function fetchOSMBoundaries(locations: BoundarySearchResult[]): Promise<any> {
+  try {
+    console.log("Fetching OSM boundaries for locations:", locations);
+    
+    // Transform locations to include OSM data for dynamic query building
+    const cities = locations.map(location => ({
+      name: location.name,
+      country: location.country_code || 'US',
+      adminLevel: location.admin_level,
+      osmId: location.osm_id,
+      osmType: location.osm_type,
+      relationId: location.osm_type === 'relation' ? location.osm_id : undefined
+    }));
+
+    const { data, error } = await supabase.functions.invoke('fetch-osm-boundaries', {
+      body: { cities }
+    });
+
+    if (error) {
+      console.error('Fetch OSM boundaries error:', error);
+      toast.error('Failed to fetch boundary data');
+      return { success: false, error: error.message };
+    }
+
+    console.log("OSM fetch results:", data);
+    return data;
+  } catch (error) {
+    console.error("Error fetching OSM boundaries:", error);
+    toast.error('Failed to fetch boundary data');
+    return { success: false, error: error.message };
   }
 }
 

@@ -12,6 +12,8 @@ interface CityQuery {
   country?: string;
   adminLevel?: number;
   relationId?: string;
+  osmId?: string;
+  osmType?: string;
 }
 
 // Helper function to normalize city names for comparison
@@ -90,6 +92,87 @@ async function saveCityData(supabase: any, cityName: string, boundaryData: any, 
   }
 }
 
+// Dynamic query builder function
+function buildOverpassQuery(city: CityQuery): string {
+  console.log(`Building query for ${city.name} with OSM data:`, { 
+    osmId: city.osmId, 
+    osmType: city.osmType, 
+    adminLevel: city.adminLevel,
+    relationId: city.relationId 
+  });
+
+  // If we have a specific relation ID from external search, use it directly
+  if (city.relationId) {
+    return `
+      [out:json][timeout:120];
+      (
+        rel(${city.relationId});
+        way(r);
+        node(w);
+      );
+      out geom;
+    `;
+  }
+
+  // If we have OSM ID and type from external search, use them
+  if (city.osmId && city.osmType === 'relation') {
+    return `
+      [out:json][timeout:120];
+      (
+        rel(${city.osmId});
+        way(r);
+        node(w);
+      );
+      out geom;
+    `;
+  }
+
+  // Build dynamic query based on city name and parameters
+  const cityName = city.name;
+  const countryFilter = city.country ? `["ISO3166-1"="${city.country}"]` : '';
+  
+  // Generate name variations for better matching
+  const nameVariations = [
+    `"${cityName}"`,
+    `"City of ${cityName}"`,
+    `"${cityName} City"`,
+    `"${cityName} Metropolitan"`,
+    `"${cityName} Metro"`,
+    `"Greater ${cityName}"`
+  ];
+
+  // Build query with multiple admin levels and name variations
+  const adminLevels = city.adminLevel ? [city.adminLevel] : [8, 6, 4]; // City, County, State levels
+  
+  let relationQueries: string[] = [];
+  
+  // Add queries for each admin level and name variation
+  adminLevels.forEach(level => {
+    nameVariations.forEach(nameVar => {
+      relationQueries.push(`rel["name"=${nameVar}]["type"="boundary"]["boundary"="administrative"]["admin_level"="${level}"]${countryFilter}`);
+      relationQueries.push(`rel["name"~"${cityName}",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="${level}"]${countryFilter}`);
+    });
+  });
+
+  // Add generic boundary queries
+  relationQueries.push(`rel["name"~"${cityName}",i]["type"="boundary"]${countryFilter}`);
+  relationQueries.push(`rel["name"~"${cityName} Metropolitan",i]["type"="boundary"]${countryFilter}`);
+  relationQueries.push(`rel["name"~"${cityName} Metro",i]["type"="boundary"]${countryFilter}`);
+  relationQueries.push(`rel["name"~"Greater ${cityName}",i]["type"="boundary"]${countryFilter}`);
+
+  // Remove duplicates
+  const uniqueQueries = [...new Set(relationQueries)];
+
+  return `
+    [out:json][timeout:120];
+    (
+      ${uniqueQueries.join(';\n      ')};
+    );
+    (._;>;);
+    out geom;
+  `;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -165,151 +248,8 @@ serve(async (req) => {
         const currentPointCount = existingBoundary?.geometry_geojson ? 
           JSON.stringify(existingBoundary.geometry_geojson).length : 0;
 
-        // Build Overpass query for the city - ensure we get all required geometry data
-        let overpassQuery = '';
-        
-        if (city.relationId) {
-          overpassQuery = `
-            [out:json][timeout:120];
-            (
-              rel(${city.relationId});
-              way(r);
-              node(w);
-            );
-            out geom;
-          `;
-        } else {
-          if (city.name === "New York" || city.name === "New York Metropolitan Area" || city.name === "New York City") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"New York City",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="New York City"]["type"="boundary"];
-                rel(175905);
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else if (city.name === "Chicago") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"Chicago",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="Chicago"]["type"="boundary"];
-                rel(122604);
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else if (city.name === "Los Angeles") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"Los Angeles",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="City of Los Angeles"]["type"="boundary"];
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else if (city.name === "Houston") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"Houston",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="City of Houston"]["type"="boundary"];
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else if (city.name === "Phoenix") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"Phoenix",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="City of Phoenix"]["type"="boundary"];
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else if (city.name === "Philadelphia") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"Philadelphia",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="City of Philadelphia"]["type"="boundary"];
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else if (city.name === "San Antonio") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"San Antonio",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="City of San Antonio"]["type"="boundary"];
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else if (city.name === "San Diego") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"San Diego",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="City of San Diego"]["type"="boundary"];
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else if (city.name === "Dallas") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"Dallas",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="City of Dallas"]["type"="boundary"];
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else if (city.name === "Austin") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"Austin",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="City of Austin"]["type"="boundary"];
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else if (city.name === "Baltimore") {
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel(133345);
-                rel["name"~"Baltimore",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
-                rel["name"="City of Baltimore"]["type"="boundary"];
-              );
-              (._;>;);
-              out geom;
-            `;
-          } else {
-            const countryFilter = city.country ? `["ISO3166-1"="${city.country}"]` : '';
-            const adminLevelFilter = city.adminLevel ? `["admin_level"="${city.adminLevel}"]` : '';
-            
-            overpassQuery = `
-              [out:json][timeout:120];
-              (
-                rel["name"~"${city.name}",i]["type"="boundary"]["boundary"="administrative"]${countryFilter}${adminLevelFilter};
-                rel["name"~"${city.name} Metropolitan",i]["type"="boundary"];
-                rel["name"~"${city.name} Metro",i]["type"="boundary"];
-                rel["name"~"Greater ${city.name}",i]["type"="boundary"];
-              );
-              (._;>;);
-              out geom;
-            `;
-          }
-        }
-
+        // Build dynamic Overpass query
+        const overpassQuery = buildOverpassQuery(city);
         console.log(`Overpass query for ${city.name}:`, overpassQuery);
 
         // Query Overpass API
