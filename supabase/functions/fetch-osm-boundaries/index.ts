@@ -281,6 +281,17 @@ serve(async (req) => {
               (._;>;);
               out geom;
             `;
+          } else if (city.name === "Baltimore") {
+            overpassQuery = `
+              [out:json][timeout:120];
+              (
+                rel(133345);
+                rel["name"~"Baltimore",i]["type"="boundary"]["boundary"="administrative"]["admin_level"="8"];
+                rel["name"="City of Baltimore"]["type"="boundary"];
+              );
+              (._;>;);
+              out geom;
+            `;
           } else {
             const countryFilter = city.country ? `["ISO3166-1"="${city.country}"]` : '';
             const adminLevelFilter = city.adminLevel ? `["admin_level"="${city.adminLevel}"]` : '';
