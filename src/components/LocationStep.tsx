@@ -39,7 +39,7 @@ export const LocationStep = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
-  const [pendingLocation, setPendingLocation] = useState<{name: string, coordinates: [number, number]} | null>(null);
+  const [pendingLocation, setPendingLocation] = useState<{name: string, coordinates: [number, number], searchResult?: any} | null>(null);
   const { toast } = useToast();
 
   const colorClasses = {
@@ -78,6 +78,7 @@ export const LocationStep = ({
       if (results.length > 0) {
         // Separate local vs external results
         const localResults = results.filter((result: any) => result.id !== null && result.source === 'local');
+        const externalResults = results.filter((result: any) => result.source === 'external');
         
         if (localResults.length > 0) {
           // If we found local results, use them
@@ -90,30 +91,13 @@ export const LocationStep = ({
               ] as [number, number],
               id: result.id.toString(),
               area_km2: result.area_km2
-            }))
+            })),
+            searchResults: results
           };
         }
         
-        // If only external results, we need to download data
-        // Don't return them as "existing" since they're not in our database
-      }
-
-      // Also check the city_boundaries table for stored data
-      const { data: similarMatches } = await supabase
-        .from('city_boundaries')
-        .select('id, name, center_lat, center_lng, area_km2')
-        .ilike('name', `%${locationName.split(',')[0].trim()}%`)
-        .limit(3);
-
-      if (similarMatches && similarMatches.length > 0) {
-        return {
-          similar: similarMatches.map(match => ({
-            name: match.name,
-            coordinates: [match.center_lng, match.center_lat] as [number, number],
-            id: match.id.toString(),
-            area_km2: match.area_km2
-          }))
-        };
+        // If only external results, return them for download
+        return { searchResults: results };
       }
 
       return {};
@@ -137,16 +121,15 @@ export const LocationStep = ({
       return;
     }
 
-    if (existingData.similar && existingData.similar.length > 0) {
-      // Show suggestions
-      setSuggestions(existingData.similar);
-      setPendingLocation({ name: location, coordinates });
-      setShowDownloadPrompt(true);
-      return;
-    }
-
+    // If we have search results, store the first one for download
+    const searchResult = existingData.searchResults?.[0];
+    
     // No existing data, prompt for download
-    setPendingLocation({ name: location, coordinates });
+    setPendingLocation({ 
+      name: location, 
+      coordinates,
+      searchResult // Store the search result with OSM data
+    });
     setShowDownloadPrompt(true);
   };
 
@@ -155,14 +138,23 @@ export const LocationStep = ({
 
     setIsDownloading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-osm-boundaries', {
-        body: {
-          cities: [{
-            name: pendingLocation.name.split(',')[0].trim(),
-            country: "US", // Default to US for now
-            adminLevel: 8
-          }]
+      const cityData: any = {
+        name: pendingLocation.name.split(',')[0].trim(),
+        country: "US", // Default to US for now
+        adminLevel: 8
+      };
+
+      // If we have search result with OSM data, include it
+      if (pendingLocation.searchResult) {
+        cityData.osmId = pendingLocation.searchResult.osm_id;
+        cityData.osmType = pendingLocation.searchResult.osm_type;
+        if (pendingLocation.searchResult.osm_type === 'relation') {
+          cityData.relationId = pendingLocation.searchResult.osm_id;
         }
+      }
+
+      const { data, error } = await supabase.functions.invoke('fetch-osm-boundaries', {
+        body: { cities: [cityData] }
       });
 
       if (error) throw error;
