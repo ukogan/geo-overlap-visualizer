@@ -357,13 +357,63 @@ serve(async (req) => {
 
         const polygons = [mainPolygon, ...additionalPolygons];
 
+        // Quality validation to guard against fragmented data
+        function validateBoundaryQuality(polygons: number[][][][]) {
+          const totalPolygons = polygons.length;
+          const mainPolygonArea = calculatePolygonArea(polygons[0][0]);
+          
+          // Filter out small fragments (less than 1% of main polygon area)
+          const filteredPolygons = polygons.filter((polygon, index) => {
+            if (index === 0) return true; // Always keep main polygon
+            const area = calculatePolygonArea(polygon[0]);
+            return area > mainPolygonArea * 0.01; // Keep if > 1% of main area
+          });
+          
+          const fragmentationRatio = totalPolygons > 1 ? (totalPolygons - filteredPolygons.length) / totalPolygons : 0;
+          
+          return {
+            isValid: filteredPolygons.length <= 10 && fragmentationRatio < 0.8, // Max 10 polygons, < 80% fragments
+            filteredPolygons,
+            originalCount: totalPolygons,
+            filteredCount: filteredPolygons.length,
+            fragmentationRatio
+          };
+        }
+        
+        function calculatePolygonArea(ring: number[][]): number {
+          if (ring.length < 3) return 0;
+          let area = 0;
+          for (let i = 0; i < ring.length - 1; i++) {
+            area += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+          }
+          return Math.abs(area) / 2;
+        }
+        
+        const qualityCheck = validateBoundaryQuality(polygons);
+        
+        if (!qualityCheck.isValid) {
+          console.log(`Boundary quality check failed for ${city.name}: ${qualityCheck.originalCount} polygons, ${(qualityCheck.fragmentationRatio * 100).toFixed(1)}% fragments`);
+          results.push({
+            name: city.name,
+            success: false,
+            error: `Fragmented boundary data: ${qualityCheck.originalCount} polygons with ${(qualityCheck.fragmentationRatio * 100).toFixed(1)}% fragments`,
+            beforePoints: currentPointCount,
+            afterPoints: 0
+          });
+          continue;
+        }
+        
+        // Use filtered polygons for final geometry
+        const finalPolygons = qualityCheck.filteredPolygons;
+        console.log(`Quality check passed for ${city.name}: filtered from ${qualityCheck.originalCount} to ${qualityCheck.filteredCount} polygons`);
+
         const geoJson = {
           type: "MultiPolygon",
-          coordinates: polygons
+          coordinates: finalPolygons
         };
 
         // Calculate statistics
-        const allCoords = polygons.flat(2);
+        const allCoords = finalPolygons.flat(2);
         const totalPoints = allCoords.length;
         
         if (totalPoints === 0) {
