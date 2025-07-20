@@ -8,6 +8,7 @@ const Index = () => {
   const [overlayLocation, setOverlayLocation] = useState<[number, number] | undefined>();
   const [baseLocationName, setBaseLocationName] = useState<string>("");
   const [overlayLocationName, setOverlayLocationName] = useState<string>("");
+  const [mapRefreshKey, setMapRefreshKey] = useState(0);
 
   const handleBaseLocationSelect = (location: string, coordinates: [number, number], boundaryId?: number) => {
     setBaseLocation(coordinates);
@@ -28,6 +29,10 @@ const Index = () => {
     setOverlayLocation(undefined);
     setBaseLocationName("");
     setOverlayLocationName("");
+  };
+
+  const handleBoundaryDataRefresh = () => {
+    setMapRefreshKey(prev => prev + 1);
   };
 
   return (
@@ -58,6 +63,7 @@ const Index = () => {
               baseLocationName={baseLocationName}
               overlayLocationName={overlayLocationName}
               onReset={handleReset}
+              onBoundaryDataRefresh={handleBoundaryDataRefresh}
             />
             
             {/* Comparison Info */}
@@ -87,6 +93,7 @@ const Index = () => {
           <div className="lg:col-span-3">
             <div className="h-full rounded-lg overflow-hidden shadow-lg border">
               <MapComponent
+                key={mapRefreshKey}
                 baseLocation={baseLocation}
                 overlayLocation={overlayLocation}
                 baseLocationName={baseLocationName}

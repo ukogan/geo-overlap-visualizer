@@ -14,6 +14,7 @@ interface ControlPanelProps {
   baseLocationName?: string;
   overlayLocationName?: string;
   onReset: () => void;
+  onBoundaryDataRefresh: () => void;
 }
 
 export const ControlPanel = ({
@@ -22,6 +23,7 @@ export const ControlPanel = ({
   baseLocationName,
   overlayLocationName,
   onReset,
+  onBoundaryDataRefresh,
 }: ControlPanelProps) => {
   const [step, setStep] = useState<"base" | "overlay">("base");
   const [isLoadingOSM, setIsLoadingOSM] = useState(false);
@@ -76,6 +78,11 @@ export const ControlPanel = ({
         title: "OSM Data Updated",
         description: `Successfully fetched detailed boundary data for ${successCount}/${totalCount} cities`,
       });
+
+      // Trigger map refresh to reload boundary data
+      if (successCount > 0) {
+        onBoundaryDataRefresh();
+      }
 
     } catch (error) {
       console.error('Error fetching OSM boundaries:', error);
