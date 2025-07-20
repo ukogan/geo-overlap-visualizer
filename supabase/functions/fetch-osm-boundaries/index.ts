@@ -182,9 +182,9 @@ serve(async (req) => {
           }
         });
 
-        // Build coordinate rings with better debugging
-        const outerRings: number[][][] = [];
-        const innerRings: number[][][] = [];
+        // Build coordinate ways with better debugging
+        const outerWays: number[][][] = [];
+        const innerWays: number[][][] = [];
 
         console.log(`Processing ${bestRelation.members?.length || 0} members for ${city.name}`);
 
@@ -213,11 +213,11 @@ serve(async (req) => {
                 
                 console.log(`Way ${member.ref}: extracted ${coords.length} coordinates`);
                 
-                if (coords.length > 2) {
+                if (coords.length > 1) {
                   if (member.role === 'outer' || member.role === '' || !member.role) {
-                    outerRings.push(coords);
+                    outerWays.push(coords);
                   } else if (member.role === 'inner') {
-                    innerRings.push(coords);
+                    innerWays.push(coords);
                   }
                 }
               } else {
@@ -227,7 +227,93 @@ serve(async (req) => {
           }
         }
 
-        console.log(`Extracted ${outerRings.length} outer rings and ${innerRings.length} inner rings for ${city.name}`);
+        console.log(`Extracted ${outerWays.length} outer ways and ${innerWays.length} inner ways for ${city.name}`);
+
+        if (outerWays.length === 0) {
+          console.log(`No valid outer ways found for ${city.name}`);
+          results.push({
+            name: city.name,
+            success: false,
+            error: 'No valid geometry ways found',
+            beforePoints: currentPointCount,
+            afterPoints: 0
+          });
+          continue;
+        }
+
+        // Function to connect ways into rings
+        function connectWays(ways: number[][][]): number[][][] {
+          if (ways.length === 0) return [];
+          if (ways.length === 1) {
+            // Single way - ensure it's closed
+            const way = ways[0];
+            if (way.length > 2) {
+              const first = way[0];
+              const last = way[way.length - 1];
+              if (Math.abs(first[0] - last[0]) > 0.0001 || Math.abs(first[1] - last[1]) > 0.0001) {
+                // Close the ring
+                return [[...way, first]];
+              }
+              return [way];
+            }
+            return [];
+          }
+
+          // Multiple ways - need to connect them
+          const rings: number[][][] = [];
+          const unusedWays = [...ways];
+
+          while (unusedWays.length > 0) {
+            const ring: number[][] = [];
+            let currentWay = unusedWays.shift()!;
+            ring.push(...currentWay);
+
+            let connected = true;
+            while (connected && unusedWays.length > 0) {
+              connected = false;
+              const ringEnd = ring[ring.length - 1];
+
+              for (let i = 0; i < unusedWays.length; i++) {
+                const way = unusedWays[i];
+                const wayStart = way[0];
+                const wayEnd = way[way.length - 1];
+
+                // Check if this way connects to the end of the current ring
+                if (Math.abs(ringEnd[0] - wayStart[0]) < 0.0001 && Math.abs(ringEnd[1] - wayStart[1]) < 0.0001) {
+                  // Connect forward
+                  ring.push(...way.slice(1));
+                  unusedWays.splice(i, 1);
+                  connected = true;
+                  break;
+                } else if (Math.abs(ringEnd[0] - wayEnd[0]) < 0.0001 && Math.abs(ringEnd[1] - wayEnd[1]) < 0.0001) {
+                  // Connect reverse
+                  ring.push(...way.slice(0, -1).reverse());
+                  unusedWays.splice(i, 1);
+                  connected = true;
+                  break;
+                }
+              }
+            }
+
+            // Ensure ring is closed
+            if (ring.length > 3) {
+              const first = ring[0];
+              const last = ring[ring.length - 1];
+              if (Math.abs(first[0] - last[0]) > 0.0001 || Math.abs(first[1] - last[1]) > 0.0001) {
+                ring.push(first);
+              }
+              rings.push(ring);
+            }
+          }
+
+          return rings;
+        }
+
+        // Connect ways into proper rings
+        const outerRings = connectWays(outerWays);
+        const innerRings = connectWays(innerWays);
+
+        console.log(`Connected into ${outerRings.length} outer rings and ${innerRings.length} inner rings for ${city.name}`);
 
         if (outerRings.length === 0) {
           console.log(`No valid outer rings found for ${city.name}`);
@@ -242,14 +328,35 @@ serve(async (req) => {
         }
 
         // Create proper MultiPolygon structure
-        const polygons = outerRings.map(outerRing => {
-          const polygon = [outerRing];
-          // Add any inner rings that might belong to this outer ring
-          innerRings.forEach(innerRing => {
-            polygon.push(innerRing);
-          });
-          return polygon;
+        // For simplicity, create one polygon with the largest outer ring and all inner rings
+        let largestOuter = outerRings[0];
+        let maxArea = 0;
+        
+        // Find the largest outer ring by approximate area
+        outerRings.forEach(ring => {
+          const bounds = ring.reduce((acc, coord) => ({
+            minLng: Math.min(acc.minLng, coord[0]),
+            maxLng: Math.max(acc.maxLng, coord[0]),
+            minLat: Math.min(acc.minLat, coord[1]),
+            maxLat: Math.max(acc.maxLat, coord[1])
+          }), { minLng: Infinity, maxLng: -Infinity, minLat: Infinity, maxLat: -Infinity });
+          
+          const area = (bounds.maxLng - bounds.minLng) * (bounds.maxLat - bounds.minLat);
+          if (area > maxArea) {
+            maxArea = area;
+            largestOuter = ring;
+          }
         });
+
+        // Create main polygon with largest outer ring and all inner rings
+        const mainPolygon = [largestOuter, ...innerRings];
+        
+        // Add any additional outer rings as separate polygons
+        const additionalPolygons = outerRings
+          .filter(ring => ring !== largestOuter)
+          .map(ring => [ring]);
+
+        const polygons = [mainPolygon, ...additionalPolygons];
 
         const geoJson = {
           type: "MultiPolygon",
