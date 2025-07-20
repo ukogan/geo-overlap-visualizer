@@ -35,7 +35,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
-    // Search local database first
+    // Search local database first - escape query for SQL safety
+    const escapedQuery = query.replace(/'/g, "''"); // Escape single quotes
     const { data: boundaries, error } = await supabaseClient
       .from('boundaries')
       .select(`
@@ -49,7 +50,7 @@ serve(async (req) => {
         geometry_geojson,
         bbox_geojson
       `)
-      .or(`name.ilike.%${query}%,name_long.ilike.%${query}%`)
+      .or(`name.ilike.%${escapedQuery}%,name_long.ilike.%${escapedQuery}%`)
       .order('admin_level', { ascending: true })
       .order('population', { ascending: false })
       .limit(5)
