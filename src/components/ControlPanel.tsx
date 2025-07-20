@@ -115,6 +115,74 @@ export const ControlPanel = ({
     }
   };
 
+  const fetchTop10USCities = async () => {
+    if (isLoadingOSM) return;
+    
+    setIsLoadingOSM(true);
+    setFetchResults([]); // Clear previous results
+    
+    try {
+      const top10USCities = [
+        { name: "New York City", country: "US", adminLevel: 8 },
+        { name: "Los Angeles", country: "US", adminLevel: 8 },
+        { name: "Chicago", country: "US", adminLevel: 8 },
+        { name: "Houston", country: "US", adminLevel: 8 },
+        { name: "Phoenix", country: "US", adminLevel: 8 },
+        { name: "Philadelphia", country: "US", adminLevel: 8 },
+        { name: "San Antonio", country: "US", adminLevel: 8 },
+        { name: "San Diego", country: "US", adminLevel: 8 },
+        { name: "Dallas", country: "US", adminLevel: 8 },
+        { name: "Austin", country: "US", adminLevel: 8 }
+      ];
+
+      const { data, error } = await supabase.functions.invoke('fetch-osm-boundaries', {
+        body: {
+          cities: top10USCities
+        }
+      });
+
+      if (error) {
+        console.error('OSM fetch error:', error);
+        throw new Error(error.message || 'Failed to fetch OSM data');
+      }
+
+      console.log('Top 10 US cities fetch response:', data);
+      
+      const results = data?.results || [];
+      setFetchResults(results);
+      onOsmResults(results);
+      
+      const successCount = results.filter((r: OSMFetchResult) => r.success).length;
+      const totalCount = results.length;
+      
+      toast({
+        title: "Top 10 US Cities Updated",
+        description: `Successfully fetched boundary data for ${successCount}/${totalCount} cities`,
+      });
+
+      // Trigger map refresh to reload boundary data
+      if (successCount > 0) {
+        onBoundaryDataRefresh();
+      }
+
+    } catch (error) {
+      console.error('Error fetching top 10 US cities:', error);
+      const errorResults: OSMFetchResult[] = [
+        { name: "Top 10 US Cities", success: false, error: error.message }
+      ];
+      setFetchResults(errorResults);
+      onOsmResults(errorResults);
+      
+      toast({
+        title: "Error",
+        description: "Failed to fetch top 10 US cities data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingOSM(false);
+    }
+  };
+
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="pb-4">
@@ -145,8 +213,17 @@ export const ControlPanel = ({
             >
               {isLoadingOSM ? "Fetching..." : "Fetch Detailed OSM Data (NY & Chicago)"}
             </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={fetchTop10USCities}
+              disabled={isLoadingOSM}
+              className="w-full text-xs h-8 mt-2"
+            >
+              {isLoadingOSM ? "Fetching..." : "Fetch Top 10 US Cities"}
+            </Button>
             <p className="text-xs text-muted-foreground">
-              Updates New York and Chicago with detailed OpenStreetMap boundary data
+              Bulk fetch boundary data for major US cities for easy comparison
             </p>
           </div>
         </div>
