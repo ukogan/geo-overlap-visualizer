@@ -25,6 +25,11 @@ export interface LocationBounds {
   };
   center: [number, number];
   bbox: [number, number, number, number];
+  // Additional properties for statistics
+  areaKm2?: number;
+  population?: number;
+  coordinateCount?: number;
+  perimeterKm?: number;
 }
 
 // Search for boundaries using our hosted data

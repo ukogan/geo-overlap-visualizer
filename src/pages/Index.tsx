@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { MapComponent } from "@/components/MapComponent";
 import { ControlPanel } from "@/components/ControlPanel";
+import { LocationStats } from "@/components/LocationStats";
 import { useBoundaryData } from "@/hooks/useBoundaryData";
 import { Globe, ArrowRight } from "lucide-react";
 
@@ -67,8 +68,8 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
-        <div className="grid lg:grid-cols-4 gap-6 h-[calc(100vh-120px)]">
+      <main className="container mx-auto px-4 py-6 space-y-6">
+        <div className="grid lg:grid-cols-4 gap-6 h-[calc(100vh-200px)]">
           {/* Control Panel */}
           <div className="lg:col-span-1">
             <ControlPanel
@@ -80,39 +81,6 @@ const Index = () => {
               onBoundaryDataRefresh={handleBoundaryDataRefresh}
               onOsmResults={handleOsmResults}
             />
-            
-            {/* Comparison Info */}
-            {baseLocation?.name && overlayLocation?.name && (
-              <div className="mt-6 p-4 bg-card rounded-lg border shadow-sm">
-                <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
-                  <ArrowRight className="h-4 w-4 text-map-blue" />
-                  Active Comparison
-                </h3>
-                <div className="space-y-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-map-blue rounded-full"></div>
-                    <span className="text-muted-foreground">Base:</span>
-                    <span className="font-medium">{baseLocation.name.split(',')[0]}</span>
-                    {baseLocation.isLoading && (
-                      <div className="w-3 h-3 border border-blue-200 border-t-blue-500 rounded-full animate-spin"></div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-map-green rounded-full"></div>
-                    <span className="text-muted-foreground">Overlay:</span>
-                    <span className="font-medium">{overlayLocation.name.split(',')[0]}</span>
-                    {overlayLocation.isLoading && (
-                      <div className="w-3 h-3 border border-green-200 border-t-green-500 rounded-full animate-spin"></div>
-                    )}
-                  </div>
-                </div>
-                {osmFetchResults.length > 0 && (
-                  <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                    Last OSM update: {osmFetchResults.filter(r => r.success).length} of {osmFetchResults.length} successful
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Map */}
@@ -128,6 +96,12 @@ const Index = () => {
             </div>
           </div>
         </div>
+
+        {/* Statistics Section */}
+        <LocationStats 
+          baseLocation={baseLocation}
+          overlayLocation={overlayLocation}
+        />
       </main>
     </div>
   );
