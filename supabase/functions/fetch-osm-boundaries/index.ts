@@ -176,22 +176,46 @@ serve(async (req) => {
           }
         });
 
-        // Build coordinate rings
+        // Build coordinate rings with better debugging
         const outerRings: number[][][] = [];
         const innerRings: number[][][] = [];
 
+        console.log(`Processing ${bestRelation.members?.length || 0} members for ${city.name}`);
+
         if (bestRelation.members) {
           for (const member of bestRelation.members) {
+            console.log(`Member ${member.ref}: type=${member.type}, role=${member.role || 'none'}`);
+            
             if (member.type === 'way') {
               const way = wayMap.get(member.ref);
-              if (way && way.geometry && way.geometry.length > 2) {
-                const coords = way.geometry.map((node: any) => [node.lon, node.lat]);
+              if (way) {
+                console.log(`Way ${member.ref}: has ${way.geometry?.length || 0} geometry points, ${way.nodes?.length || 0} node refs`);
                 
-                if (member.role === 'outer' || member.role === '' || !member.role) {
-                  outerRings.push(coords);
-                } else if (member.role === 'inner') {
-                  innerRings.push(coords);
+                // Try both geometry (with coordinates) and nodes (references)
+                let coords: number[][] = [];
+                
+                if (way.geometry && way.geometry.length > 0) {
+                  // Use direct geometry coordinates
+                  coords = way.geometry.map((node: any) => [node.lon, node.lat]);
+                } else if (way.nodes && way.nodes.length > 0) {
+                  // Build coordinates from node references
+                  coords = way.nodes
+                    .map((nodeId: number) => nodeMap.get(nodeId))
+                    .filter((node: any) => node && node.lat && node.lon)
+                    .map((node: any) => [node.lon, node.lat]);
                 }
+                
+                console.log(`Way ${member.ref}: extracted ${coords.length} coordinates`);
+                
+                if (coords.length > 2) {
+                  if (member.role === 'outer' || member.role === '' || !member.role) {
+                    outerRings.push(coords);
+                  } else if (member.role === 'inner') {
+                    innerRings.push(coords);
+                  }
+                }
+              } else {
+                console.log(`Way ${member.ref}: not found in wayMap`);
               }
             }
           }
