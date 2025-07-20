@@ -558,6 +558,22 @@ serve(async (req) => {
         const allCoords = finalPolygons.flat(2);
         const totalPoints = allCoords.length;
         
+        console.log(`Generated geometry with ${totalPoints} total points for ${city.name}`);
+        
+        // Add validation for minimum point count
+        if (totalPoints < 50) {
+          console.warn(`⚠️  WARNING: ${city.name} has only ${totalPoints} points - likely incomplete boundary data`);
+          results.push({
+            name: city.name,
+            success: false,
+            error: `Insufficient geometry data: only ${totalPoints} points (minimum 50 required for complete boundary)`,
+            beforePoints: currentPointCount,
+            afterPoints: totalPoints,
+            warning: true
+          });
+          continue;
+        }
+        
         if (totalPoints === 0) {
           results.push({
             name: city.name,
