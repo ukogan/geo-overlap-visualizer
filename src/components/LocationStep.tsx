@@ -57,39 +57,55 @@ export const LocationStep = ({
 
   const checkExistingData = async (locationName: string) => {
     try {
-      // Check for exact and similar matches
-      const { data: exactMatch } = await supabase
-        .from('city_boundaries')
-        .select('id, name, center_lat, center_lng, area_km2')
-        .eq('normalized_name', locationName.toLowerCase().replace(/[^a-z0-9]/g, ''))
-        .single();
+      // Normalize the search term better
+      const normalizedSearch = locationName.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim();
+      
+      // Check for exact and similar matches using the original search method
+      const { data, error } = await supabase.functions.invoke('search-boundaries', {
+        body: { query: locationName }
+      });
 
-      if (exactMatch) {
-      return {
-        exact: {
-          name: exactMatch.name,
-          coordinates: [exactMatch.center_lng, exactMatch.center_lat] as [number, number],
-          id: exactMatch.id.toString(),
-          area_km2: exactMatch.area_km2
-        }
-      };
+      if (error) {
+        console.error('Search error:', error);
+        return {};
       }
 
-      // Check for similar matches
+      const results = data.features || [];
+      
+      if (results.length > 0) {
+        // If we found results, it means the data exists
+        return {
+          existing: results.map((result: any) => ({
+            name: result.name || result.place_name,
+            coordinates: [result.bbox ? (result.bbox[0] + result.bbox[2]) / 2 : 0, 
+                         result.bbox ? (result.bbox[1] + result.bbox[3]) / 2 : 0] as [number, number],
+            id: result.id.toString(),
+            area_km2: result.area_km2
+          }))
+        };
+      }
+
+      // Also check the city_boundaries table for stored data
       const { data: similarMatches } = await supabase
         .from('city_boundaries')
         .select('id, name, center_lat, center_lng, area_km2')
         .ilike('name', `%${locationName.split(',')[0].trim()}%`)
         .limit(3);
 
-      return {
-        similar: similarMatches?.map(match => ({
-          name: match.name,
-          coordinates: [match.center_lng, match.center_lat] as [number, number],
-          id: match.id.toString(),
-          area_km2: match.area_km2
-        })) || []
-      };
+      if (similarMatches && similarMatches.length > 0) {
+        return {
+          similar: similarMatches.map(match => ({
+            name: match.name,
+            coordinates: [match.center_lng, match.center_lat] as [number, number],
+            id: match.id.toString(),
+            area_km2: match.area_km2
+          }))
+        };
+      }
+
+      return {};
     } catch (error) {
       console.error('Error checking existing data:', error);
       return {};
@@ -99,12 +115,13 @@ export const LocationStep = ({
   const handleLocationSearch = async (location: string, coordinates: [number, number]) => {
     const existingData = await checkExistingData(location);
 
-    if (existingData.exact) {
-      // Use existing data
-      onLocationSelect(existingData.exact.name, existingData.exact.coordinates, parseInt(existingData.exact.id));
+    if (existingData.existing && existingData.existing.length > 0) {
+      // Use the first existing match
+      const match = existingData.existing[0];
+      onLocationSelect(match.name, match.coordinates, parseInt(match.id));
       toast({
         title: "Using existing data",
-        description: `${existingData.exact.name} is already available in the database`,
+        description: `${match.name} is already available in the database`,
       });
       return;
     }
@@ -252,11 +269,11 @@ export const LocationStep = ({
                   <p className="text-sm font-medium mb-2">Similar locations already available:</p>
                   <div className="space-y-2">
                     {suggestions.map((suggestion, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                        <div>
-                          <span className="text-sm font-medium">{suggestion.name}</span>
+                      <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium truncate block">{suggestion.name}</span>
                           {suggestion.area_km2 && (
-                            <span className="text-xs text-muted-foreground ml-2">
+                            <span className="text-xs text-muted-foreground">
                               ({suggestion.area_km2.toFixed(0)} km²)
                             </span>
                           )}
@@ -265,6 +282,7 @@ export const LocationStep = ({
                           size="sm" 
                           variant="outline"
                           onClick={() => handleUseSuggestion(suggestion)}
+                          className="ml-2 flex-shrink-0"
                         >
                           Use this
                         </Button>
@@ -279,12 +297,12 @@ export const LocationStep = ({
                 </p>
               )}
               
-              <div className="flex gap-2 mt-3">
+              <div className="flex flex-col sm:flex-row gap-2 mt-3">
                 <Button 
                   size="sm" 
                   onClick={handleDownload}
                   disabled={isDownloading}
-                  className={colorClasses[color].button}
+                  className={`${colorClasses[color].button} flex-1`}
                 >
                   {isDownloading ? (
                     <>
@@ -303,6 +321,7 @@ export const LocationStep = ({
                   variant="outline" 
                   onClick={handleSkipDownload}
                   disabled={isDownloading}
+                  className="flex-1"
                 >
                   Use point location
                 </Button>

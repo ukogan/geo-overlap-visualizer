@@ -52,10 +52,14 @@ export const DatabaseViewer = ({ onLocationSelect, selectedLocationId }: Databas
     if (!boundaryData) return 0;
     
     try {
-      if (boundaryData.type === 'Polygon') {
-        return boundaryData.coordinates?.[0]?.length || 0;
-      } else if (boundaryData.type === 'MultiPolygon') {
-        return boundaryData.coordinates?.reduce((total: number, polygon: any) => {
+      // The data structure is nested: boundary_data.boundary.geometry
+      const geometry = boundaryData.boundary?.geometry;
+      if (!geometry) return 0;
+      
+      if (geometry.type === 'Polygon') {
+        return geometry.coordinates?.[0]?.length || 0;
+      } else if (geometry.type === 'MultiPolygon') {
+        return geometry.coordinates?.reduce((total: number, polygon: any) => {
           return total + (polygon[0]?.length || 0);
         }, 0) || 0;
       }
