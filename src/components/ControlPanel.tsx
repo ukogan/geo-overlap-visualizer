@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { LocationStep } from "./LocationStep";
-import { RefreshCcw, Map } from "lucide-react";
+import { RefreshCcw, Map, ArrowUpDown } from "lucide-react";
 import { OSMFetchResult } from "@/hooks/useBoundaryData";
 
 interface ControlPanelProps {
@@ -14,6 +14,7 @@ interface ControlPanelProps {
   onReset: () => void;
   onBoundaryDataRefresh: () => void;
   onOsmResults: (results: OSMFetchResult[]) => void;
+  onSwapLocations: () => void;
 }
 
 export const ControlPanel = ({
@@ -24,6 +25,7 @@ export const ControlPanel = ({
   onReset,
   onBoundaryDataRefresh,
   onOsmResults,
+  onSwapLocations,
 }: ControlPanelProps) => {
   const [step, setStep] = useState<"base" | "overlay">("base");
 
@@ -79,6 +81,22 @@ export const ControlPanel = ({
           onLocationSelect={handleOverlayLocationSelect}
           isActive={step === "overlay" && !!baseLocationName}
         />
+
+        {/* Swap Button */}
+        {baseLocationName && overlayLocationName && (
+          <>
+            <Separator />
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onSwapLocations}
+              className="w-full"
+            >
+              <ArrowUpDown className="h-4 w-4 mr-2" />
+              Swap Locations
+            </Button>
+          </>
+        )}
 
         {/* Reset Button */}
         {(baseLocationName || overlayLocationName) && (

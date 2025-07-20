@@ -153,6 +153,16 @@ export function useBoundaryData() {
     setOsmFetchResults(results);
   }, []);
 
+  const swapLocations = useCallback(() => {
+    if (baseLocation && overlayLocation) {
+      const tempBase = baseLocation;
+      setBaseLocation(overlayLocation);
+      setOverlayLocation(tempBase);
+      return true; // Return true to indicate successful swap
+    }
+    return false; // Return false if can't swap
+  }, [baseLocation, overlayLocation]);
+
   return {
     baseLocation,
     overlayLocation,
@@ -164,6 +174,7 @@ export function useBoundaryData() {
     selectOverlayLocation,
     resetLocations,
     refreshBoundaryData,
-    setOsmResults
+    setOsmResults,
+    swapLocations
   };
 }

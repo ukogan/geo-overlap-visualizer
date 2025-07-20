@@ -19,7 +19,8 @@ const Index = () => {
     selectOverlayLocation,
     resetLocations,
     refreshBoundaryData,
-    setOsmResults
+    setOsmResults,
+    swapLocations
   } = useBoundaryData();
 
   const handleBaseLocationSelect = (location: string, coordinates: [number, number], boundaryId?: number) => {
@@ -51,6 +52,14 @@ const Index = () => {
     setTimeout(() => {
       handleBoundaryDataRefresh();
     }, 1000);
+  };
+
+  const handleSwapLocations = () => {
+    const swapped = swapLocations();
+    if (swapped) {
+      // Trigger map refresh to recenter on new base location
+      setMapRefreshKey(prev => prev + 1);
+    }
   };
 
   return (
@@ -96,6 +105,7 @@ const Index = () => {
                   onReset={handleReset}
                   onBoundaryDataRefresh={handleBoundaryDataRefresh}
                   onOsmResults={handleOsmResults}
+                  onSwapLocations={handleSwapLocations}
                 />
               </div>
 
