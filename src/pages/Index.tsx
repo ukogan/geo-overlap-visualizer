@@ -3,11 +3,14 @@ import { useState } from "react";
 import { MapComponent } from "@/components/MapComponent";
 import { ControlPanel } from "@/components/ControlPanel";
 import { LocationStats } from "@/components/LocationStats";
+import { DatabaseViewer } from "@/components/DatabaseViewer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBoundaryData } from "@/hooks/useBoundaryData";
-import { Globe, ArrowRight } from "lucide-react";
+import { Globe, ArrowRight, Map, Database } from "lucide-react";
 
 const Index = () => {
   const [mapRefreshKey, setMapRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState("comparison");
   const {
     baseLocation,
     overlayLocation,
@@ -68,40 +71,65 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        <div className="grid lg:grid-cols-4 gap-6 h-[calc(100vh-200px)]">
-          {/* Control Panel */}
-          <div className="lg:col-span-1">
-            <ControlPanel
-              onBaseLocationSelect={handleBaseLocationSelect}
-              onOverlayLocationSelect={handleOverlayLocationSelect}
-              baseLocationName={baseLocation?.name}
-              overlayLocationName={overlayLocation?.name}
-              onReset={handleReset}
-              onBoundaryDataRefresh={handleBoundaryDataRefresh}
-              onOsmResults={handleOsmResults}
-            />
-          </div>
+      <main className="container mx-auto px-4 py-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="comparison" className="flex items-center gap-2">
+              <Map className="h-4 w-4" />
+              Geographic Comparison
+            </TabsTrigger>
+            <TabsTrigger value="database" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Database Locations
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="comparison" className="space-y-6">
+            <div className="grid lg:grid-cols-4 gap-6 h-[calc(100vh-250px)]">
+              {/* Control Panel */}
+              <div className="lg:col-span-1">
+                <ControlPanel
+                  onBaseLocationSelect={handleBaseLocationSelect}
+                  onOverlayLocationSelect={handleOverlayLocationSelect}
+                  baseLocationName={baseLocation?.name}
+                  overlayLocationName={overlayLocation?.name}
+                  onReset={handleReset}
+                  onBoundaryDataRefresh={handleBoundaryDataRefresh}
+                  onOsmResults={handleOsmResults}
+                />
+              </div>
 
-          {/* Map */}
-          <div className="lg:col-span-3">
-            <div className="h-full rounded-lg overflow-hidden shadow-lg border">
-              <MapComponent
-                baseLocation={baseLocation?.coordinates}
-                overlayLocation={overlayLocation?.coordinates}
-                baseLocationName={baseLocation?.name}
-                overlayLocationName={overlayLocation?.name}
-                refreshKey={mapRefreshKey}
-              />
+              {/* Map */}
+              <div className="lg:col-span-3">
+                <div className="h-full rounded-lg overflow-hidden shadow-lg border">
+                  <MapComponent
+                    baseLocation={baseLocation?.coordinates}
+                    overlayLocation={overlayLocation?.coordinates}
+                    baseLocationName={baseLocation?.name}
+                    overlayLocationName={overlayLocation?.name}
+                    refreshKey={mapRefreshKey}
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Statistics Section */}
-        <LocationStats 
-          baseLocation={baseLocation}
-          overlayLocation={overlayLocation}
-        />
+            {/* Statistics Section */}
+            <LocationStats 
+              baseLocation={baseLocation}
+              overlayLocation={overlayLocation}
+            />
+          </TabsContent>
+          
+          <TabsContent value="database" className="mt-6">
+            <DatabaseViewer 
+              onLocationSelect={(name, coordinates, id) => {
+                // Switch to comparison tab and select as base location
+                handleBaseLocationSelect(name, coordinates, id);
+                setActiveTab("comparison");
+              }}
+            />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

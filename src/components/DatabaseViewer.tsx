@@ -65,7 +65,7 @@ export const DatabaseViewer = ({ onLocationSelect, selectedLocationId }: Databas
     }
   };
 
-  const handleUseLocation = (city: CityData) => {
+  const handleUseLocation = (city: CityData, action: 'base' | 'overlay' = 'base') => {
     if (onLocationSelect && city.center_lat && city.center_lng) {
       onLocationSelect(city.name, [city.center_lng, city.center_lat], parseInt(city.id));
     }
@@ -73,95 +73,103 @@ export const DatabaseViewer = ({ onLocationSelect, selectedLocationId }: Databas
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            Database Cities
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
+      <div className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Database Locations</h2>
+          <p className="text-muted-foreground">Manage and explore your downloaded boundary data</p>
+        </div>
+        <Card>
+          <CardContent className="flex items-center justify-center py-8">
             <div className="text-sm text-muted-foreground">Loading cities...</div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Database className="h-5 w-5" />
-          Database Cities ({cities.length})
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Cities with boundary data available for comparison
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold mb-2">Database Locations</h2>
+        <p className="text-muted-foreground">
+          Manage and explore your downloaded boundary data ({cities.length} cities available)
         </p>
-      </CardHeader>
-      <CardContent>
-        {cities.length === 0 ? (
-          <div className="text-center py-8">
-            <Database className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">
-              No cities in database yet. Download some boundary data to get started.
+      </div>
+
+      {cities.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Database className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No cities in database</h3>
+            <p className="text-muted-foreground mb-4">
+              Switch to the Geographic Comparison tab to download boundary data for cities.
             </p>
-          </div>
-        ) : (
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {cities.map((city) => (
-              <div 
-                key={city.id} 
-                className={`p-3 border rounded-lg space-y-2 transition-colors ${
-                  selectedLocationId === parseInt(city.id) 
-                    ? 'border-primary bg-primary/5' 
-                    : 'hover:bg-muted/50'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-medium text-sm">{city.name}</h4>
-                      {city.country_code && (
-                        <Badge variant="outline" className="text-xs">
-                          {city.country_code}
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                      {city.area_km2 && (
-                        <div>Area: {city.area_km2.toFixed(0)} km²</div>
-                      )}
-                      <div>Points: {getPointCount(city.boundary_data).toLocaleString()}</div>
-                      {city.population && (
-                        <div>Pop: {city.population.toLocaleString()}</div>
-                      )}
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDistanceToNow(new Date(city.created_at), { addSuffix: true })}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {cities.map((city) => (
+            <Card 
+              key={city.id} 
+              className={`transition-colors hover:bg-muted/50 ${
+                selectedLocationId === parseInt(city.id) 
+                  ? 'border-primary bg-primary/5' 
+                  : ''
+              }`}
+            >
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-semibold">{city.name}</h4>
+                        {city.country_code && (
+                          <Badge variant="outline" className="text-xs">
+                            {city.country_code}
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                        {city.area_km2 && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {city.area_km2.toFixed(0)} km²
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <Database className="h-3 w-3" />
+                          {getPointCount(city.boundary_data).toLocaleString()} pts
+                        </div>
+                        {city.population && (
+                          <div className="col-span-2">
+                            Pop: {city.population.toLocaleString()}
+                          </div>
+                        )}
+                        <div className="col-span-2 flex items-center gap-1 text-xs">
+                          <Calendar className="h-3 w-3" />
+                          {formatDistanceToNow(new Date(city.created_at), { addSuffix: true })}
+                        </div>
                       </div>
                     </div>
                   </div>
                   
                   {onLocationSelect && city.center_lat && city.center_lng && (
                     <Button 
-                      size="sm" 
-                      variant="outline"
                       onClick={() => handleUseLocation(city)}
-                      className="ml-2"
+                      className="w-full"
+                      size="sm"
                     >
-                      <MapPin className="h-3 w-3 mr-1" />
-                      Use
+                      <MapPin className="h-3 w-3 mr-2" />
+                      Use for Comparison
                     </Button>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
