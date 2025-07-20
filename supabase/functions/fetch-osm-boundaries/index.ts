@@ -290,22 +290,17 @@ serve(async (req) => {
         // Calculate approximate area
         const areaKm2 = Math.abs((maxLng - minLng) * (maxLat - minLat)) * 111 * 111;
 
-        // Update boundary data with proper PostGIS geometry
-        const { error: upsertError } = await supabase
-          .from('boundaries')
-          .upsert({
-            name: city.name,
-            geometry_geojson: geoJson,
-            bbox_geojson: bbox,
-            center_lng: centerLng,
-            center_lat: centerLat,
-            area_km2: areaKm2,
-            admin_level: city.adminLevel || null,
-            country_code: city.country || null,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'name'
-          });
+        // Update boundary data with proper PostGIS geometry using RPC call
+        const { error: upsertError } = await supabase.rpc('upsert_boundary', {
+          boundary_name: city.name,
+          geojson_data: geoJson,
+          bbox_data: bbox,
+          center_lng: centerLng,
+          center_lat: centerLat,
+          area_km2: areaKm2,
+          admin_level: city.adminLevel || null,
+          country_code: city.country || null
+        });
 
         if (upsertError) {
           console.error(`Database error for ${city.name}:`, upsertError);
