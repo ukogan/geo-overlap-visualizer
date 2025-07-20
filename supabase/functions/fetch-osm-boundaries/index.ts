@@ -56,21 +56,50 @@ serve(async (req) => {
             out geom;
           `;
         } else {
-          // Search for the city/metro area by name
-          const searchName = city.name.toLowerCase();
-          const countryFilter = city.country ? `["ISO3166-1"="${city.country}"]` : '';
-          const adminLevelFilter = city.adminLevel ? `["admin_level"="${city.adminLevel}"]` : '';
-          
-          overpassQuery = `
-            [out:json][timeout:60];
-            (
-              rel["name"~"${city.name}",i]["type"="boundary"]["boundary"="administrative"]${countryFilter}${adminLevelFilter};
-              rel["name"~"${city.name} Metropolitan",i]["type"="boundary"];
-              rel["name"~"${city.name} Metro",i]["type"="boundary"];
-              rel["name"~"Greater ${city.name}",i]["type"="boundary"];
-            );
-            out geom;
-          `;
+          // For US metropolitan areas, try multiple search strategies
+          if (city.name === "New York") {
+            // Try specific relation ID for NYC metro area
+            overpassQuery = `
+              [out:json][timeout:60];
+              (
+                rel["name"~"New York",i]["type"="boundary"]["boundary"="administrative"]["admin_level"~"[4-6]"];
+                rel["name"~"New York Metropolitan",i]["type"="boundary"];
+                rel["name"~"Greater New York",i]["type"="boundary"];
+                rel["name"~"New York City",i]["type"="boundary"]["boundary"="administrative"];
+                rel(175905);
+              );
+              out geom;
+            `;
+          } else if (city.name === "Chicago") {
+            // Try specific approaches for Chicago metro area
+            overpassQuery = `
+              [out:json][timeout:60];
+              (
+                rel["name"~"Chicago",i]["type"="boundary"]["boundary"="administrative"]["admin_level"~"[4-6]"];
+                rel["name"~"Chicago Metropolitan",i]["type"="boundary"];
+                rel["name"~"Greater Chicago",i]["type"="boundary"];
+                rel["name"~"Chicagoland",i]["type"="boundary"];
+                rel(122604);
+              );
+              out geom;
+            `;
+          } else {
+            // Generic search for other cities
+            const searchName = city.name.toLowerCase();
+            const countryFilter = city.country ? `["ISO3166-1"="${city.country}"]` : '';
+            const adminLevelFilter = city.adminLevel ? `["admin_level"="${city.adminLevel}"]` : '';
+            
+            overpassQuery = `
+              [out:json][timeout:60];
+              (
+                rel["name"~"${city.name}",i]["type"="boundary"]["boundary"="administrative"]${countryFilter}${adminLevelFilter};
+                rel["name"~"${city.name} Metropolitan",i]["type"="boundary"];
+                rel["name"~"${city.name} Metro",i]["type"="boundary"];
+                rel["name"~"Greater ${city.name}",i]["type"="boundary"];
+              );
+              out geom;
+            `;
+          }
         }
 
         console.log(`Overpass query for ${city.name}:`, overpassQuery);
