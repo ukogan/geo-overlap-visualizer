@@ -181,11 +181,20 @@ export const MapComponent = ({
           )
           .addTo(map.current!);
 
-        // Fit map to boundary
-        map.current?.fitBounds(bounds.bbox, {
-          padding: { top: 50, bottom: 50, left: 50, right: 50 },
-          duration: 2000
+        // Re-center map to base location and fit to boundary
+        map.current?.flyTo({
+          center: baseLocation,
+          zoom: 9,
+          duration: 1500
         });
+        
+        // Then fit to boundary with padding
+        setTimeout(() => {
+          map.current?.fitBounds(bounds.bbox, {
+            padding: { top: 50, bottom: 50, left: 50, right: 50 },
+            duration: 1500
+          });
+        }, 500);
       })
       .catch((error) => {
         console.error("Error loading base boundary:", error);

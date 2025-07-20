@@ -60,7 +60,7 @@ export const LocationSearch = ({ onLocationSelect, placeholder = "Search for a l
     
     // Use the simple name instead of full place_name for boundary data lookup
     onLocationSelect(location.name, center, location.id);
-    setQuery(location.place_name);
+    setQuery(location.name);
     setSuggestions([]);
   };
 
