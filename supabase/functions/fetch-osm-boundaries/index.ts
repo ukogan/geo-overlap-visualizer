@@ -103,7 +103,7 @@ function buildOverpassQuery(city: CityQuery): string {
 
   // If we have a specific relation ID from external search, use it directly
   if (city.relationId) {
-    return `
+    const query = `
       [out:json][timeout:120];
       (
         rel(${city.relationId});
@@ -112,6 +112,8 @@ function buildOverpassQuery(city: CityQuery): string {
       );
       out geom;
     `;
+    console.log(`Using relation ID query for ${city.name}:`, query);
+    return query;
   }
 
   // If we have OSM ID and type from external search, use them
