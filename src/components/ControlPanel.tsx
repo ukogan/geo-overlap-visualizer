@@ -27,6 +27,7 @@ export const ControlPanel = ({
 }: ControlPanelProps) => {
   const [step, setStep] = useState<"base" | "overlay">("base");
   const [isLoadingOSM, setIsLoadingOSM] = useState(false);
+  const [fetchResults, setFetchResults] = useState<any[]>([]);
   const { toast } = useToast();
 
   const handleBaseLocationSelect = (location: string, coordinates: [number, number]) => {
@@ -47,6 +48,8 @@ export const ControlPanel = ({
     if (isLoadingOSM) return;
     
     setIsLoadingOSM(true);
+    setFetchResults([]); // Clear previous results
+    
     try {
       const { data, error } = await supabase.functions.invoke('fetch-osm-boundaries', {
         body: {
@@ -71,8 +74,11 @@ export const ControlPanel = ({
 
       console.log('OSM fetch results:', data);
       
-      const successCount = data.results?.filter((r: any) => r.success).length || 0;
-      const totalCount = data.results?.length || 0;
+      const results = data.results || [];
+      setFetchResults(results);
+      
+      const successCount = results.filter((r: any) => r.success).length;
+      const totalCount = results.length;
       
       toast({
         title: "OSM Data Updated",
@@ -91,6 +97,7 @@ export const ControlPanel = ({
         description: "Failed to fetch OSM boundary data",
         variant: "destructive",
       });
+      setFetchResults([]);
     } finally {
       setIsLoadingOSM(false);
     }
@@ -131,6 +138,34 @@ export const ControlPanel = ({
             </p>
           </div>
         </div>
+
+        {/* Fetch Results Display */}
+        {fetchResults.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                Results
+              </Badge>
+              <span className="text-sm font-medium">Data Fetched</span>
+            </div>
+            <div className="space-y-2">
+              {fetchResults.map((result, index) => (
+                <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded text-xs">
+                  <span className="font-medium">{result.name}</span>
+                  {result.success ? (
+                    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                      {result.coordinateCount?.toLocaleString() || 0} points
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                      Failed
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Separator />
 
