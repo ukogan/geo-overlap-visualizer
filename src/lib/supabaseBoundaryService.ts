@@ -2,15 +2,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export interface BoundarySearchResult {
-  id: number;
+  id: number | null;
   place_name: string;
   name: string;
   admin_level: number;
   country_code: string;
-  area_km2: number;
-  population: number;
+  area_km2: number | null;
+  population: number | null;
   geometry: any;
   bbox: any;
+  center?: [number, number];
+  osm_id?: string;
+  osm_type?: string;
+  source?: 'local' | 'external';
 }
 
 export interface LocationBounds {

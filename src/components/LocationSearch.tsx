@@ -42,13 +42,21 @@ export const LocationSearch = ({ onLocationSelect, placeholder = "Search for a l
   };
 
   const handleLocationClick = (location: BoundarySearchResult) => {
-    // Calculate center from bbox if available, otherwise use geometry centroid
-    const center: [number, number] = location.bbox?.coordinates?.[0] ? [
-      (Math.min(...location.bbox.coordinates[0].map((c: number[]) => c[0])) + 
-       Math.max(...location.bbox.coordinates[0].map((c: number[]) => c[0]))) / 2,
-      (Math.min(...location.bbox.coordinates[0].map((c: number[]) => c[1])) + 
-       Math.max(...location.bbox.coordinates[0].map((c: number[]) => c[1]))) / 2
-    ] : [0, 0]; // fallback, should be calculated from geometry
+    // Use provided center coordinates, or calculate from bbox, or fallback
+    let center: [number, number];
+    
+    if (location.center) {
+      center = location.center;
+    } else if (location.bbox?.coordinates?.[0]) {
+      center = [
+        (Math.min(...location.bbox.coordinates[0].map((c: number[]) => c[0])) + 
+         Math.max(...location.bbox.coordinates[0].map((c: number[]) => c[0]))) / 2,
+        (Math.min(...location.bbox.coordinates[0].map((c: number[]) => c[1])) + 
+         Math.max(...location.bbox.coordinates[0].map((c: number[]) => c[1]))) / 2
+      ];
+    } else {
+      center = [0, 0]; // fallback
+    }
     
     onLocationSelect(location.place_name, center, location.id);
     setQuery(location.place_name);
@@ -69,19 +77,23 @@ export const LocationSearch = ({ onLocationSelect, placeholder = "Search for a l
       
       {suggestions.length > 0 && (
         <Card className="absolute top-full left-0 right-0 mt-1 z-50 max-h-60 overflow-y-auto">
-          {suggestions.map((location) => (
+          {suggestions.map((location, index) => (
             <Button
-              key={location.id}
+              key={location.id || `external-${index}`}
               variant="ghost"
               className="w-full justify-start text-left h-auto p-3 hover:bg-secondary"
               onClick={() => handleLocationClick(location)}
             >
               <MapPin className="h-4 w-4 mr-2 text-map-blue flex-shrink-0" />
               <div className="flex flex-col items-start">
-                <span className="truncate font-medium">{location.name}</span>
+                <span className="truncate font-medium">
+                  {location.name}
+                  {location.source === 'local' && <span className="ml-1 text-xs bg-green-100 text-green-800 px-1 rounded">Downloaded</span>}
+                </span>
                 <span className="text-xs text-muted-foreground truncate">
                   {location.country_code ? `${location.country_code.toUpperCase()} • ` : ''}
-                  Level {location.admin_level} • {location.area_km2?.toFixed(0)} km²
+                  Level {location.admin_level}
+                  {location.area_km2 && ` • ${location.area_km2.toFixed(0)} km²`}
                 </span>
               </div>
             </Button>
